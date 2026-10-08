@@ -21,6 +21,8 @@ venv/
 .pytest_cache/
 *.sqlite3
 *.db
+# 분석 스크립트 실행 결과 (--json 출력 등)
+backend/out/
 
 # ── 데이터셋·모델 가중치 ──
 # 원본은 저장소 밖(D:\Deepfake_Datasets, D:\Deepfake_Models)에 두고 경로는 환경변수로 받는다.

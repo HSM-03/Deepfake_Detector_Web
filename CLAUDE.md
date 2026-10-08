@@ -39,6 +39,20 @@ backend/              FastAPI + Celery/Redis + SQLite + 분석 파이프라인 (
   - Windows 쪽에서 실행할 때는 `wsl docker compose ...`처럼 WSL을 거친다.
   - WSL을 재시작한 뒤 Docker 데몬에 연결되지 않으면 WSL에서 `sudo service docker start`가 필요할 수 있다.
   - dlib(얼굴 정렬)처럼 Windows 설치가 까다로운 분석 코드도 처음부터 Docker(리눅스) 안에서 실행한다.
+- 분석용 이미지는 `backend/Dockerfile`로 만든다(Python 3.10, PyTorch CPU, efficientnet_pytorch, OpenCV, dlib).
+  `requirements.txt`가 바뀔 때만 다시 빌드한다. 코드는 `-v`로 연결하므로 고쳐도 다시 빌드할 필요가 없다.
+
+  ```bash
+  wsl docker build -t deepfake-analysis ./backend
+  ```
+
+  메인 모델 단독 실행(1단계) — Celeb-DF에서 평가 세트를 뺀 진짜·가짜 각 5개:
+
+  ```bash
+  wsl docker run --rm -v /mnt/d/Deepfake_Detector_Web/backend:/app -v /mnt/d/Deepfake_Models:/models:ro -v /mnt/d/Deepfake_Datasets:/data:ro deepfake-analysis python -m scripts.run_main_model --celebdf-sample 5
+  ```
+
+  분석 설정(프레임 수, 이상치 제거 비율, 구간 길이, 경로)은 `backend/analysis/settings.py` 한 곳에 있다.
 - 메인 모델은 학습하지 않고 노트북 CPU로 추론만 한다. 학습은 rPPG 특징 기반 로지스틱 회귀/SVM뿐이다.
   데이터셋 전체 특징 추출처럼 분량이 많은 작업만 Colab/Kaggle 무료 GPU를 한시적으로 쓴다.
 

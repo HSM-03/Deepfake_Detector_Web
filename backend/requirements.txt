@@ -1,0 +1,11 @@
+# PyTorch CPU 전용판을 받는 주소
+--extra-index-url https://download.pytorch.org/whl/cpu
+
+# 메인 모델 (DeepfakeBench EfficientNet-B4)
+torch==2.5.1
+efficientnet_pytorch==0.7.1
+
+# 영상·얼굴 처리
+opencv-python-headless==4.10.0.84
+dlib==19.24.6
+numpy==1.26.4
