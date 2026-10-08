@@ -1,0 +1,40 @@
+# ── 공통 ──
+.DS_Store
+Thumbs.db
+*.log
+
+# 비밀 값·개인 설정 (.env.development 같은 공용 설정은 올린다)
+.env
+.env.local
+.env.*.local
+*.local
+
+# ── 프론트엔드 ──
+node_modules/
+frontend/dist/
+
+# ── 백엔드 (Python) ──
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.pytest_cache/
+*.sqlite3
+*.db
+
+# ── 데이터셋·모델 가중치 ──
+# 원본은 저장소 밖(D:\Deepfake_Datasets, D:\Deepfake_Models)에 두고 경로는 환경변수로 받는다.
+# 실수로 저장소 안에 복사해도 올라가지 않도록 확장자로 막는다.
+*.zip
+*.mp4
+*.mov
+*.avi
+*.webm
+*.mkv
+*.pth
+*.pt
+*.ckpt
+*.onnx
+*.dat
+*.npy
+*.npz

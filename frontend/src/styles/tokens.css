@@ -1,0 +1,91 @@
+/*
+ * 디자인 토큰.
+ * 색상·타이포그래피는 화면설계서가 "기본설계에서 확정"으로 미뤄 둔 항목이며, 2026-10-01에 아래 값으로 정했다.
+ * 컴포넌트에서는 색을 직접 쓰지 않고 이 변수만 참조한다.
+ *
+ * 판정 색은 역할별로 셋을 둔다.
+ *   --verdict-*        글자·테두리용 (흰 바탕에서 대비 4.5:1 이상)
+ *   --verdict-*-fill   차트 막대·게이지 채움용 (색각 이상에서도 서로 구분되도록 검증한 조합)
+ *   --verdict-*-bright 어두운 판정 카드 위 글자용
+ * 어느 경우에도 색만으로 구분하지 않고 기호·글자를 같이 쓴다.
+ */
+:root {
+  /* 레이아웃 (공통 규격: 데스크톱 1440×1000 기준, 콘텐츠 최대 폭 1200px, 헤더 고정) */
+  --layout-max-width: 1200px;
+  --header-height: 64px;
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-8: 32px;
+  --space-10: 40px;
+  --radius-sm: 8px;
+  --radius: 12px;
+  --radius-lg: 16px;
+  --radius-pill: 999px;
+
+  /* 바탕·글자 */
+  --color-bg: #f2f4f8;
+  --color-surface: #ffffff;
+  --color-surface-sunken: #f5f7fa;
+  --color-border: #e3e7ee;
+  --color-border-strong: #c9d0db;
+  --color-text: #0f1728;
+  --color-text-muted: #556070;
+
+  /* 강조색 */
+  --color-primary: #3d5ae0;
+  --color-primary-strong: #2f48c4;
+  --color-primary-contrast: #ffffff;
+  --color-primary-bg: #eef1fe;
+
+  /* 상태색 — 아이콘·글자와 항상 병기 */
+  --color-success: #0f766e;
+  --color-warning: #b45309;
+  --color-warning-bg: #fff5e0;
+  --color-warning-border: #f2d59c;
+  --color-danger: #be123c;
+  --color-danger-bg: #ffe9ee;
+  --color-danger-border: #f5b8c6;
+
+  /* 판정색 */
+  --verdict-real: #0f766e;
+  --verdict-real-bg: #e2f5f2;
+  --verdict-real-fill: #0d9488;
+  --verdict-real-bright: #2dd4bf;
+  --verdict-fake: #be123c;
+  --verdict-fake-bg: #ffe9ee;
+  --verdict-fake-fill: #be123c;
+  --verdict-fake-bright: #fb7185;
+  --verdict-hold: #b45309;
+  --verdict-hold-bg: #fff2d9;
+  --verdict-hold-fill: #d97706;
+  --verdict-hold-bright: #fbbf24;
+  --verdict-failed: #475467;
+  --verdict-failed-bg: #eef1f5;
+  --verdict-failed-bright: #cbd5e1;
+  --verdict-running: #3d5ae0;
+  --verdict-running-bg: #eef1fe;
+  --verdict-canceled: #667085;
+  --verdict-canceled-bg: #f0f2f5;
+
+  /* 어두운 판정 카드 */
+  --hero-bg-from: #0f1728;
+  --hero-bg-to: #1d2947;
+  --hero-text: #f5f7fb;
+  --hero-text-muted: #aab4c6;
+  --hero-line: rgb(255 255 255 / 0.14);
+  --hero-track: rgb(255 255 255 / 0.1);
+
+  /* 그림자·가림 */
+  --shadow-card: 0 1px 2px rgb(15 23 40 / 0.04), 0 8px 24px rgb(15 23 40 / 0.05);
+  --shadow-raised: 0 16px 48px rgb(15 23 40 / 0.22);
+  --color-overlay: rgb(15 23 40 / 0.5);
+  --focus-ring: 0 0 0 3px rgb(61 90 224 / 0.28);
+
+  /* 타이포그래피 — Pretendard 가변 글꼴(pretendard 패키지, main.tsx에서 불러옴) */
+  --font-sans: 'Pretendard Variable', Pretendard, -apple-system, 'Segoe UI', 'Malgun Gothic', system-ui, sans-serif;
+  --font-mono: ui-monospace, 'SF Mono', 'Cascadia Mono', Consolas, monospace;
+}

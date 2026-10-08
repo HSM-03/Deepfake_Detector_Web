@@ -1,0 +1,267 @@
+/* SCR-02 분석 진행 상태 */
+
+.progress__header {
+  flex-direction: row;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-6);
+}
+
+.progress__card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-8);
+  padding: var(--space-8);
+}
+
+/* ③ 지금 무엇을 하고 있는지가 가장 먼저 읽히게 한다 */
+.progress__summary {
+  display: grid;
+  grid-template-columns: 132px minmax(0, 1fr);
+  align-items: center;
+  gap: var(--space-6);
+}
+
+.progress__percent {
+  font-size: 60px;
+  font-weight: 800;
+  line-height: 1;
+  letter-spacing: -0.04em;
+}
+
+.progress__percent small {
+  margin-left: 2px;
+  color: var(--color-text-muted);
+  font-size: 24px;
+  font-weight: 700;
+  letter-spacing: 0;
+}
+
+.progress__message {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--space-4);
+  margin-bottom: var(--space-3);
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.progress__message .muted {
+  flex-shrink: 0;
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.progress__summary .progress-bar {
+  height: 10px;
+}
+
+.progress__actions {
+  justify-content: space-between;
+}
+
+/* ② 스테퍼 */
+
+.stepper {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1.1fr 1fr;
+  align-items: center;
+  gap: var(--space-8);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.stepper__col {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+/* 칸 사이 연결선 */
+.stepper__col + .stepper__col::before {
+  content: '';
+  position: absolute;
+  top: 50%;
+  right: 100%;
+  width: var(--space-8);
+  border-top: 2px solid var(--color-border);
+}
+
+.stepper__col--parallel {
+  padding: var(--space-2);
+  border: 1px dashed var(--color-border-strong);
+  border-radius: var(--radius-lg);
+  background: var(--color-surface-sunken);
+}
+
+.stepper__parallel {
+  color: var(--color-text-muted);
+  font-size: 12px;
+  font-weight: 600;
+  text-align: center;
+}
+
+.step {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  background: var(--color-surface);
+  transition:
+    border-color 0.3s,
+    background 0.3s;
+}
+
+.step__marker {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  border: 2px solid var(--color-border-strong);
+  border-radius: 50%;
+  color: var(--color-text-muted);
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.step__text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  line-height: 1.4;
+}
+
+.step__label {
+  font-weight: 700;
+}
+
+.step__state {
+  color: var(--color-text-muted);
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+}
+
+.step--waiting .step__label,
+.step--canceled .step__label {
+  color: var(--color-text-muted);
+}
+
+.step--running {
+  border-color: var(--color-primary);
+  background: var(--color-primary-bg);
+  box-shadow: var(--focus-ring);
+}
+
+.step--running .step__marker {
+  border-color: var(--color-primary);
+  color: var(--color-primary);
+  animation: step-pulse 1.4s ease-in-out infinite;
+}
+
+.step--running .step__state {
+  color: var(--color-primary);
+  font-weight: 600;
+}
+
+.step--done .step__marker {
+  border-color: var(--color-success);
+  background: var(--color-success);
+  color: var(--color-surface);
+}
+
+.step--failed {
+  border-color: var(--color-danger);
+  background: var(--color-danger-bg);
+}
+
+.step--failed .step__marker {
+  border-color: var(--color-danger);
+  background: var(--color-danger);
+  color: var(--color-surface);
+}
+
+.step--failed .step__state {
+  color: var(--color-danger);
+  font-weight: 600;
+}
+
+.step--canceled {
+  border-style: dashed;
+}
+
+.stepper--canceled .step--done .step__marker {
+  border-color: var(--color-text-muted);
+  background: var(--color-text-muted);
+}
+
+.stepper--canceled .step__label {
+  color: var(--color-text-muted);
+}
+
+@keyframes step-pulse {
+  50% {
+    opacity: 0.35;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .step--running .step__marker {
+    animation: none;
+  }
+}
+
+/* ④ 단계 로그 — 시간순 타임라인 */
+
+.progress-log {
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.progress-log li {
+  position: relative;
+  display: grid;
+  grid-template-columns: 76px 140px minmax(0, 1fr);
+  gap: var(--space-3);
+  padding: var(--space-2) 0 var(--space-2) var(--space-6);
+}
+
+/* 점과 세로선 */
+.progress-log li::before {
+  content: '';
+  position: absolute;
+  top: 17px;
+  left: 4px;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--color-primary);
+}
+
+.progress-log li:not(:last-child)::after {
+  content: '';
+  position: absolute;
+  top: 27px;
+  bottom: -15px;
+  left: 7px;
+  border-left: 2px solid var(--color-border);
+}
+
+.progress-log time {
+  color: var(--color-text-muted);
+  font-family: var(--font-mono);
+  font-size: 13px;
+  line-height: 1.85;
+}
+
+.progress-log__stage {
+  font-weight: 700;
+}

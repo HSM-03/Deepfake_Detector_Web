@@ -1,0 +1,794 @@
+/* 결과 화면: SCR-03 분석 결과 요약 · SCR-06 분석 불가 안내 · SCR-07 판단 보류 결과 */
+
+.result {
+  gap: var(--space-5);
+}
+
+.result-grid {
+  display: grid;
+  grid-template-columns: 7fr 5fr;
+  gap: var(--space-5);
+}
+
+.result-grid--even {
+  grid-template-columns: 1fr 1fr;
+}
+
+.result-grid > .card {
+  min-width: 0;
+}
+
+/* 머리말: 어떤 영상의 결과인지 */
+
+.result-header__file {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--space-3);
+}
+
+.result-header__file strong {
+  font-size: 16px;
+}
+
+.result-header__file .muted {
+  font-size: 13.5px;
+}
+
+.result-header__facts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin: var(--space-1) 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.result-header__facts li {
+  padding: 2px 10px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-pill);
+  background: var(--color-surface);
+  color: var(--color-text-muted);
+  font-size: 12.5px;
+  font-variant-numeric: tabular-nums;
+}
+
+.result-header__facts .result-header__memo {
+  border-color: transparent;
+  background: var(--color-primary-bg);
+  color: var(--color-primary);
+}
+
+/* ① 최종 판정 카드 — 어두운 바탕에 판정색으로 빛을 준다 */
+
+.verdict-hero {
+  --accent: var(--verdict-failed-bright);
+  position: relative;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 380px;
+  gap: var(--space-10);
+  overflow: hidden;
+  padding: var(--space-8) var(--space-10);
+  border-radius: var(--radius-lg);
+  background: linear-gradient(135deg, var(--hero-bg-from), var(--hero-bg-to));
+  color: var(--hero-text);
+  box-shadow: var(--shadow-raised);
+}
+
+.verdict-hero--real {
+  --accent: var(--verdict-real-bright);
+}
+
+.verdict-hero--fake {
+  --accent: var(--verdict-fake-bright);
+}
+
+.verdict-hero--hold {
+  --accent: var(--verdict-hold-bright);
+}
+
+/* 왼쪽 위에서 번지는 판정색 */
+.verdict-hero::before {
+  content: '';
+  position: absolute;
+  top: -220px;
+  left: -160px;
+  width: 560px;
+  height: 560px;
+  border-radius: 50%;
+  background: radial-gradient(closest-side, var(--accent), transparent);
+  opacity: 0.28;
+  pointer-events: none;
+}
+
+.verdict-hero > * {
+  position: relative;
+}
+
+.verdict-hero__main {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: var(--space-3);
+  min-width: 0;
+}
+
+.verdict-hero__eyebrow {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  color: var(--hero-text-muted);
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+
+.verdict-hero__label {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-3);
+  color: var(--accent);
+  font-size: 52px;
+  font-weight: 800;
+  line-height: 1.1;
+  letter-spacing: -0.03em;
+}
+
+.verdict-hero__label > span {
+  font-size: 40px;
+}
+
+.verdict-hero__label small {
+  padding: 3px 12px;
+  border: 1px solid currentColor;
+  border-radius: var(--radius-pill);
+  font-size: 14px;
+  font-weight: 700;
+  letter-spacing: 0;
+  transform: translateY(-10px);
+}
+
+.verdict-hero__text {
+  max-width: 560px;
+  font-size: 16px;
+  line-height: 1.65;
+}
+
+.verdict-hero__flag {
+  align-self: flex-start;
+  padding: var(--space-1) var(--space-3);
+  border: 1px solid var(--verdict-hold-bright);
+  border-radius: var(--radius-pill);
+  color: var(--verdict-hold-bright);
+  font-size: 13.5px;
+  font-weight: 600;
+}
+
+.verdict-hero__score {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding-left: var(--space-10);
+  border-left: 1px solid var(--hero-line);
+}
+
+.verdict-hero__value {
+  font-size: 64px;
+  font-weight: 800;
+  line-height: 1;
+  letter-spacing: -0.03em;
+}
+
+/* 판단 보류: 점수 자리에 '—' */
+.verdict-hero__value--empty {
+  color: var(--hero-text-muted);
+  font-weight: 300;
+}
+
+.verdict-hero__zone {
+  color: var(--hero-text-muted);
+  font-size: 13.5px;
+}
+
+/* 종합 점수 게이지 */
+
+.score-gauge {
+  margin-top: var(--space-5);
+}
+
+.score-gauge__track {
+  position: relative;
+  display: flex;
+  gap: 2px;
+}
+
+.score-gauge__zone {
+  flex-basis: 0;
+  height: 10px;
+  background: var(--hero-track);
+}
+
+.score-gauge__zone:first-child {
+  border-radius: var(--radius-pill) 0 0 var(--radius-pill);
+}
+
+.score-gauge__zone:nth-child(3) {
+  border-radius: 0 var(--radius-pill) var(--radius-pill) 0;
+}
+
+.score-gauge__zone--real {
+  background: var(--verdict-real-bright);
+}
+
+.score-gauge__zone--hold {
+  background: var(--verdict-hold-bright);
+}
+
+.score-gauge__zone--fake {
+  background: var(--verdict-fake-bright);
+}
+
+/* 구간 이름은 막대 위에 */
+.score-gauge__zone span {
+  display: block;
+  color: var(--hero-text-muted);
+  font-size: 12px;
+  text-align: center;
+  transform: translateY(-20px);
+}
+
+.score-gauge__needle {
+  position: absolute;
+  top: 50%;
+  width: 18px;
+  height: 18px;
+  border: 4px solid var(--hero-text);
+  border-radius: 50%;
+  background: var(--hero-bg-from);
+  box-shadow: 0 0 0 3px var(--hero-bg-from);
+  transform: translate(-50%, -50%);
+}
+
+.score-gauge__ticks {
+  position: relative;
+  height: 20px;
+  margin-top: var(--space-2);
+  color: var(--hero-text-muted);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+
+.score-gauge__ticks span {
+  position: absolute;
+  transform: translateX(-50%);
+}
+
+.score-gauge__ticks span:first-child {
+  transform: none;
+}
+
+.score-gauge__ticks span:last-child {
+  transform: translateX(-100%);
+}
+
+/* 산출식 */
+
+.formula {
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface-sunken);
+  color: var(--color-text-muted);
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+}
+
+.equation {
+  display: flex;
+  align-items: stretch;
+  gap: var(--space-2);
+}
+
+.equation__group {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding: var(--space-3) var(--space-2);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  text-align: center;
+}
+
+.equation__group--result {
+  flex: 0.7;
+  border-color: var(--color-text);
+  background: var(--color-text);
+  color: var(--color-surface);
+}
+
+.equation__name {
+  font-size: 12.5px;
+  font-weight: 700;
+}
+
+.equation__numbers {
+  font-size: 20px;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.equation__numbers b {
+  font-weight: 800;
+}
+
+.equation__legend {
+  font-size: 11.5px;
+  opacity: 0.7;
+}
+
+.equation__op {
+  align-self: center;
+  color: var(--color-text-muted);
+  font-size: 20px;
+  font-weight: 700;
+}
+
+.weight {
+  gap: var(--space-2);
+  padding-top: var(--space-4);
+  border-top: 1px solid var(--color-border);
+}
+
+.weight__title {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-weight: 700;
+}
+
+.weight__bar {
+  display: flex;
+  gap: 2px;
+  height: 12px;
+}
+
+.weight__model,
+.weight__rppg {
+  flex-basis: 0;
+  min-width: 4px;
+}
+
+.weight__model {
+  border-radius: var(--radius-pill) 0 0 var(--radius-pill);
+  background: var(--color-text);
+}
+
+.weight__rppg {
+  border-radius: 0 var(--radius-pill) var(--radius-pill) 0;
+  background: var(--color-primary);
+}
+
+.weight__legend {
+  display: flex;
+  justify-content: space-between;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+/* 판단 보류 조건 */
+
+.hold-conditions {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.hold-conditions li {
+  display: flex;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  border: 1px solid var(--color-warning-border);
+  border-radius: var(--radius);
+  background: var(--color-warning-bg);
+}
+
+.hold-conditions__mark {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: var(--color-warning);
+  color: var(--color-surface);
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.hold-conditions__detail {
+  display: block;
+  color: var(--color-text-muted);
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ② 두 판별 축 점수 */
+
+.chart-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2) var(--space-4);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  color: var(--color-text-muted);
+  font-size: 12.5px;
+}
+
+.chart-legend li {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.chart-legend__swatch {
+  width: 10px;
+  height: 10px;
+  border-radius: 3px;
+}
+
+.chart-legend__dash {
+  width: 0;
+  height: 14px;
+  border-left: 2px dashed var(--color-text-muted);
+}
+
+.chart-legend__line {
+  width: 0;
+  height: 14px;
+  border-left: 2px solid var(--color-text);
+}
+
+.callout {
+  display: flex;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  border-radius: var(--radius);
+}
+
+.callout__icon {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  color: var(--color-surface);
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.callout__detail {
+  display: block;
+  color: var(--color-text-muted);
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+}
+
+.callout--ok {
+  background: var(--verdict-real-bg);
+}
+
+.callout--ok .callout__icon {
+  background: var(--color-success);
+}
+
+.callout--warn {
+  background: var(--color-warning-bg);
+}
+
+.callout--warn .callout__icon {
+  background: var(--color-warning);
+}
+
+/* ③ 신호 품질 카드 */
+
+.sqi__head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.sqi__value {
+  font-size: 44px;
+  font-weight: 800;
+  line-height: 1;
+  letter-spacing: -0.03em;
+}
+
+.sqi__grade {
+  padding: 3px 12px;
+  border-radius: var(--radius-pill);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.sqi__grade--good {
+  background: var(--verdict-real-bg);
+  color: var(--color-success);
+}
+
+.sqi__grade--fair {
+  background: var(--color-warning-bg);
+  color: var(--color-warning);
+}
+
+.sqi__grade--poor {
+  background: var(--color-danger-bg);
+  color: var(--color-danger);
+}
+
+/* 0~1 막대 위에 하한 위치를 표시한다 */
+.sqi__scale {
+  position: relative;
+  padding-bottom: var(--space-5);
+}
+
+.sqi__threshold {
+  position: absolute;
+  top: -4px;
+  padding-top: 22px;
+  border-left: 2px dashed var(--color-text-muted);
+  color: var(--color-text-muted);
+  font-size: 12px;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+.sqi__threshold::first-line {
+  line-height: 1;
+}
+
+.sqi__components {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-3) var(--space-8);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.sqi__components li {
+  display: grid;
+  grid-template-columns: 64px minmax(0, 1fr) 36px;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: 14px;
+}
+
+.sqi__component-value {
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+
+.meter {
+  height: 8px;
+  overflow: hidden;
+  border-radius: var(--radius-pill);
+  background: var(--color-primary-bg);
+}
+
+.meter__fill {
+  height: 100%;
+  border-radius: var(--radius-pill);
+  background: var(--color-primary);
+}
+
+.meter--lg {
+  height: 12px;
+}
+
+/* 등급에 따라 채움색이 바뀐다. 빈 부분은 같은 계열의 옅은 색 */
+.meter--good {
+  background: var(--verdict-real-bg);
+}
+
+.meter--good .meter__fill {
+  background: var(--verdict-real-fill);
+}
+
+.meter--fair {
+  background: var(--verdict-hold-bg);
+}
+
+.meter--fair .meter__fill {
+  background: var(--verdict-hold-fill);
+}
+
+.meter--poor {
+  background: var(--verdict-fake-bg);
+}
+
+.meter--poor .meter__fill {
+  background: var(--verdict-fake-fill);
+}
+
+/* ④ 부위별 심박 */
+
+.roi__summary {
+  color: var(--color-text-muted);
+  font-size: 13.5px;
+}
+
+.roi__summary strong {
+  color: var(--color-text);
+}
+
+/* ⑥ 액션 바 */
+
+.action-bar {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-4) var(--space-5);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  background: var(--color-surface);
+  box-shadow: var(--shadow-card);
+}
+
+.action-bar__spacer {
+  flex: 1;
+  color: var(--color-text-muted);
+  font-size: 13.5px;
+}
+
+/* SCR-07 ③ 검토자 최종 판단 */
+
+.review__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-4);
+}
+
+.review__state {
+  padding: 3px 12px;
+  border-radius: var(--radius-pill);
+  background: var(--verdict-hold-bg);
+  color: var(--verdict-hold);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.review__state--done {
+  background: var(--verdict-real-bg);
+  color: var(--color-success);
+}
+
+.review__choices {
+  display: flex;
+  gap: var(--space-3);
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.review__choices legend {
+  margin-bottom: var(--space-2);
+  padding: 0;
+  font-weight: 600;
+}
+
+/* 고른 항목이 분명히 보이게 라디오를 버튼 모양으로 감싼다 */
+.review__choices label {
+  padding: var(--space-2) var(--space-4);
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-sm);
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.review__choices label:has(input:checked) {
+  border-color: var(--color-primary);
+  background: var(--color-primary-bg);
+  color: var(--color-primary);
+}
+
+.review__reason {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  font-weight: 600;
+}
+
+.review__summary {
+  display: grid;
+  grid-template-columns: 160px 220px minmax(0, 1fr);
+  gap: var(--space-6);
+  margin: 0;
+}
+
+.review__summary dt {
+  color: var(--color-text-muted);
+  font-size: 13px;
+}
+
+.review__summary dd {
+  margin: 0;
+}
+
+/* SCR-06 분석 불가 안내 */
+
+.failure-head {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: var(--space-6);
+  padding: var(--space-8);
+}
+
+.failure-head__icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 64px;
+  height: 64px;
+  border-radius: 50%;
+  background: var(--verdict-failed-bg);
+  color: var(--verdict-failed);
+  font-size: 30px;
+  font-weight: 800;
+}
+
+.failure-head__title {
+  margin-top: var(--space-2);
+  font-size: 24px;
+  font-weight: 800;
+  line-height: 1.35;
+  letter-spacing: -0.02em;
+}
+
+.failure-check--failed td:last-child {
+  color: var(--color-danger);
+  font-weight: 700;
+}
+
+.failure-suggestions {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  counter-reset: suggestion;
+}
+
+.failure-suggestions li {
+  display: flex;
+  gap: var(--space-3);
+  counter-increment: suggestion;
+}
+
+.failure-suggestions li::before {
+  content: counter(suggestion);
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: var(--color-primary-bg);
+  color: var(--color-primary);
+  font-size: 13px;
+  font-weight: 700;
+}

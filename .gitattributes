@@ -1,0 +1,8 @@
+# 줄바꿈을 LF로 고정한다. 백엔드는 리눅스 컨테이너에서 돌기 때문에
+# Windows 방식(CRLF)으로 바뀌면 셸 스크립트(.sh)나 Dockerfile이 깨질 수 있다.
+* text=auto eol=lf
+
+# 바이너리
+*.png binary
+*.jpg binary
+*.woff2 binary

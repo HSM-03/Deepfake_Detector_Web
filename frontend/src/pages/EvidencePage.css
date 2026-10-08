@@ -1,0 +1,186 @@
+/* SCR-04 판정 근거 상세 */
+
+.evidence__head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-6);
+}
+
+.evidence__head .verdict-badge {
+  padding: 6px 16px;
+  font-size: 15px;
+}
+
+.evidence__toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-6);
+  min-height: 48px;
+}
+
+/* ① 탭 — 한 덩어리로 묶인 선택 막대 */
+
+.tabs {
+  display: flex;
+  gap: var(--space-1);
+  padding: var(--space-1);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  background: var(--color-surface);
+  box-shadow: var(--shadow-card);
+}
+
+.tab {
+  padding: var(--space-2) var(--space-5);
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: none;
+  color: var(--color-text-muted);
+  font-weight: 600;
+  cursor: pointer;
+  transition:
+    background 0.15s,
+    color 0.15s;
+}
+
+.tab:hover {
+  color: var(--color-text);
+}
+
+.tab[aria-selected='true'] {
+  background: var(--color-text);
+  color: var(--color-surface);
+}
+
+/* ② ROI 선택기 */
+
+.roi-picker {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.roi-picker__label {
+  margin-right: var(--space-1);
+  color: var(--color-text-muted);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.roi-picker .btn {
+  min-height: 34px;
+  padding: 0 var(--space-4);
+  border-radius: var(--radius-pill);
+}
+
+.roi-picker .btn[aria-pressed='true'] {
+  border-color: var(--color-primary);
+  background: var(--color-primary-bg);
+  color: var(--color-primary);
+}
+
+/* 차트 배치: 두 칸, 필요한 칸만 전체 폭 */
+
+.evidence-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-5);
+}
+
+.evidence-grid > * {
+  min-width: 0;
+}
+
+.evidence-grid__wide {
+  grid-column: 1 / -1;
+}
+
+/* ⑥ 특징 표 */
+
+.feature-row--conflict {
+  background: var(--color-warning-bg);
+}
+
+.feature-row__tag {
+  margin-left: var(--space-2);
+  padding: 1px 8px;
+  border-radius: var(--radius-pill);
+  background: var(--color-warning);
+  color: var(--color-surface);
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.feature-row__meaning {
+  display: block;
+  color: var(--color-text-muted);
+  font-size: 13px;
+  font-weight: 400;
+}
+
+.feature-row__value {
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.feature-judgement {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 11px;
+  border-radius: var(--radius-pill);
+  font-size: 13px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.feature-judgement--ok {
+  background: var(--verdict-real-bg);
+  color: var(--color-success);
+}
+
+.feature-judgement--warn {
+  background: var(--color-warning-bg);
+  color: var(--color-warning);
+}
+
+.feature-row--conflict .feature-judgement--warn {
+  background: var(--color-surface);
+}
+
+.feature-judgement--bad {
+  background: var(--color-danger-bg);
+  color: var(--color-danger);
+}
+
+.axis-summary {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: var(--space-4);
+  margin: 0;
+}
+
+.axis-summary > div {
+  padding: var(--space-4);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+}
+
+.axis-summary dt {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+  color: var(--color-text-muted);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.axis-summary dd {
+  margin: var(--space-1) 0 0;
+  font-size: 28px;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+}
