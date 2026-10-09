@@ -1,7 +1,7 @@
 import { InfoTip } from '@/components/common/InfoTip';
 import { formatScore } from '@/lib/format';
 import { TERMS } from '@/lib/terms';
-import { scoreZone, VERDICT_META, type ScoreZone } from '@/lib/verdict';
+import { REVIEW_STATE_META, reviewStateOf, scoreZone, VERDICT_META, type ScoreZone } from '@/lib/verdict';
 import type { DoneResult, HoldResult, Thresholds } from '@/types/api';
 import { ScoreGauge } from './ScoreGauge';
 
@@ -22,7 +22,7 @@ function zoneText(zone: ScoreZone, t: Thresholds): string {
 /**
  * SCR-03 ① 최종 판정 카드 — 화면에서 가장 먼저 읽히는 자리.
  * 판정 라벨과 자연어 해석, 종합 점수 S와 그 위치를 보여 준다. (산출식은 바로 아래 ScoreFormula)
- * SCR-07에서는 보류 변형으로 그린다: '판단 보류 · 재검토 필요', S는 '—'.
+ * SCR-07에서는 보류 변형으로 그린다: '판단 보류' 옆에 검토 상태(검토 대기 / 추가 검토 필요 / 검토 완료), S는 '—'.
  */
 export function VerdictCard({ result }: Props) {
   const meta = VERDICT_META[result.verdict];
@@ -35,7 +35,7 @@ export function VerdictCard({ result }: Props) {
         <p className="verdict-hero__label">
           <span aria-hidden="true">{meta.symbol}</span>
           {meta.label}
-          {result.result_type === 'hold' && <small>재검토 필요</small>}
+          {result.result_type === 'hold' && <small>{REVIEW_STATE_META[reviewStateOf(result.review)].label}</small>}
         </p>
         <p className="verdict-hero__text">{result.interpretation}</p>
         {result.result_type === 'done' && result.rppg_low_contribution && (

@@ -30,7 +30,7 @@ export function parseHistoryQuery(params: URLSearchParams): HistoryQuery {
     from: dateParam(params.get('from')),
     to: dateParam(params.get('to')),
     sqi_min: sqiMin && sqiMinValue >= 0 && sqiMinValue <= 1 ? sqiMinValue : undefined,
-    review: review === 'pending' || review === 'reviewed' ? review : undefined,
+    review: review === 'pending' || review === 'needs_more_review' || review === 'reviewed' ? review : undefined,
     page: Number.isInteger(page) && page >= 1 ? page : 1,
     page_size: PAGE_SIZES.includes(pageSize) ? pageSize : DEFAULT_PAGE_SIZE,
   };

@@ -12,8 +12,8 @@ export const paths = {
   evidence: (jobId: string) => `/jobs/${jobId}/evidence`,
   /** SCR-05 분석 이력 */
   history: () => '/history',
-  /** SCR-05에서 검토 판단을 기다리는 보류 건만 ('재검토' 필터) */
-  historyPendingReview: () => '/history?review=pending',
+  /** SCR-05에서 판단 보류 건만 (검토 대기·추가 검토 필요·검토 완료 모두) */
+  historyHold: () => '/history?verdict=hold',
 };
 
 /** 이력 행 클릭 시 상태별 이동 경로 (SCR-05 → SCR-02 / 03 / 06 / 07) */

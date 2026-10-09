@@ -1,0 +1,42 @@
+# 백엔드 개발 환경: Redis + API 서버 + 분석 워커
+# 실행(WSL, 저장소 루트에서): docker compose up --build
+
+services:
+  redis:
+    image: redis:7-alpine
+
+  api:
+    build: ./backend
+    image: deepfake-backend
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+    ports:
+      - "8000:8000"
+    environment:
+      DATA_DIR: /var/lib/deepfake
+      REDIS_URL: redis://redis:6379/0
+      WATCHFILES_FORCE_POLLING: "true"
+    volumes:
+      - ./backend:/app
+      - app-data:/var/lib/deepfake
+    depends_on:
+      - redis
+
+  worker:
+    build: ./backend
+    image: deepfake-backend
+    command: celery -A app.worker worker --loglevel=info --concurrency=1
+    environment:
+      DATA_DIR: /var/lib/deepfake
+      REDIS_URL: redis://redis:6379/0
+      MODEL_DIR: /models
+      DATASET_DIR: /data
+    volumes:
+      - ./backend:/app
+      - app-data:/var/lib/deepfake
+      - ${MODEL_HOST_DIR:-/mnt/d/Deepfake_Models}:/models:ro
+      - ${DATASET_HOST_DIR:-/mnt/d/Deepfake_Datasets}:/data:ro
+    depends_on:
+      - redis
+
+volumes:
+  app-data:

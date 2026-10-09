@@ -11,4 +11,8 @@ WORKDIR /app
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
+# 웹 서버·작업 큐 라이브러리. dlib 설치 다음에 두어서, 이 목록이 바뀌어도 위의 dlib 층은 다시 만들지 않는다
+COPY requirements-api.txt .
+RUN pip install --no-cache-dir -r requirements-api.txt
+
 COPY . .

@@ -10,9 +10,15 @@
 docs/
   screen-spec.md      화면설계서 v1.3 요약 — 화면과 API 7개의 기준
   backend-plan.md     백엔드·분석 파이프라인 진행 계획 — 확정 결정, 미결정 사항, 0~5단계, 완료 기준
-frontend/             React 대시보드 (완성, 목 API로 동작). 세부 규칙은 frontend/CLAUDE.md
-backend/              FastAPI + Celery/Redis + SQLite + 분석 파이프라인 (docs/backend-plan.md 2단계부터 만든다)
+frontend/             React 대시보드 (완성). 세부 규칙은 frontend/CLAUDE.md
+backend/
+  app/                FastAPI(API 7개) + Celery 워커 + SQLite·Redis — 웹 백엔드
+  analysis/           분석 파이프라인(메인 모델, 얼굴 정렬, 융합 판정, 더미 값). 설정은 analysis/settings.py 한 곳
+  scripts/            웹 없이 실행하는 분석 스크립트(1단계 메인 모델 단독 실행 등)
+docker-compose.yml    Redis + API 서버 + 워커
 ```
+
+진행 상황은 `docs/backend-plan.md`의 각 단계 아래 "결과"에 기록한다. 지금은 2단계(백엔드 골격, 더미 분석)까지 끝났다.
 
 - **API 형식의 기준은 `frontend/src/types/api.ts`다.** 백엔드 응답은 이 타입과 정확히 맞아야 한다.
   형식을 바꿔야 하면 바꾸기 전에 사용자에게 알리고, 타입 → 목(`frontend/src/mocks/`) → 백엔드를 함께 고친다.
@@ -33,26 +39,41 @@ backend/              FastAPI + Celery/Redis + SQLite + 분석 파이프라인 (
 ## 개발 환경
 
 - 코드는 Windows의 VS Code에서 작성한다.
-- **프론트엔드**: Windows에서 `frontend/` 폴더로 들어가 `npm run dev` (http://localhost:5173)
+- **프론트엔드**: Windows PowerShell에서 `frontend/` 폴더로 들어가 `npm run dev` (http://localhost:5173)
+  - 기본은 목 API(`frontend/.env.development`의 `VITE_USE_MOCK=true`).
+  - 실제 백엔드에 붙이려면 `frontend/.env.development.local`에 `VITE_USE_MOCK=false` 한 줄을 넣고 `npm run dev`를 다시 시작한다.
+    이 파일은 `.local`로 끝나 git에 올라가지 않으므로 PC마다 따로 정한다. 목을 끄면 화면 아래 DEV 패널이 사라진다.
 - **백엔드**: WSL2 Ubuntu 안에 직접 설치한 Docker로 실행한다(Docker Desktop은 쓰지 않는다).
   - API 서버·Celery 워커·Redis는 docker compose 하나로 띄운다. Redis와 Celery가 Windows를 공식 지원하지 않기 때문이다.
-  - Windows 쪽에서 실행할 때는 `wsl docker compose ...`처럼 WSL을 거친다.
+  - docker 명령은 WSL 터미널(`wsl`로 들어가 `cd /mnt/d/Deepfake_Detector_Web`)에서 실행한다.
   - WSL을 재시작한 뒤 Docker 데몬에 연결되지 않으면 WSL에서 `sudo service docker start`가 필요할 수 있다.
   - dlib(얼굴 정렬)처럼 Windows 설치가 까다로운 분석 코드도 처음부터 Docker(리눅스) 안에서 실행한다.
-- 분석용 이미지는 `backend/Dockerfile`로 만든다(Python 3.10, PyTorch CPU, efficientnet_pytorch, OpenCV, dlib).
-  `requirements.txt`가 바뀔 때만 다시 빌드한다. 코드는 `-v`로 연결하므로 고쳐도 다시 빌드할 필요가 없다.
+  - 가중치·데이터셋 경로가 다른 PC는 저장소 루트 `.env`(git 제외)에 `MODEL_HOST_DIR=…`, `DATASET_HOST_DIR=…`를 적는다.
 
-  ```bash
-  wsl docker build -t deepfake-analysis ./backend
-  ```
+  | 명령 (WSL, 저장소 루트) | 하는 일 |
+  |---|---|
+  | `docker compose up --build` | 이미지를 (다시) 빌드하고 Redis·API·워커를 띄운다. 로그가 화면에 계속 나온다(`Ctrl + C`로 끔) |
+  | `docker compose up` | 이미지 변경 없이 띄운다 |
+  | `docker compose down` | 컨테이너를 끈다. **볼륨(DB·업로드 영상)은 남는다** |
+  | `docker compose down -v` | 볼륨까지 지운다(DB 초기화). 테이블 구조를 바꿨을 때만 |
+  | `docker compose restart worker` | 워커만 다시 시작. **워커 코드(`app/tasks.py`, `analysis/` 등)를 고치면 필요하다**(API 서버는 `--reload`로 자동 반영) |
+  | `docker compose logs -f worker` | 워커 로그를 계속 본다. 작업마다 단계 시작·완료·최종 상태가 한 줄씩 찍힌다 |
+  | `docker compose run --rm api python -m app.db` | DB 파일 위치, WAL 모드, 테이블 목록 확인 |
+
+  - API 문서(자동 생성): http://localhost:8000/docs, 상태 확인: http://localhost:8000/api/health
+  - **더미 모드**(`USE_DUMMY_ANALYSIS`, 기본 켜짐): 점수는 파일명 키워드로 고른 예시 값이다(`fake` / `hold` / `fail`·`noface` / `lowsqi`,
+    그 외 진짜). 업로드·검증(파일 손상, 10초 미만)과 융합 판정 규칙은 실제로 동작한다. 실제 모델을 붙이는 3단계에서 끈다.
+- 분석용 이미지는 `backend/Dockerfile`로 만든다(Python 3.10, PyTorch CPU, efficientnet_pytorch, OpenCV, dlib + 웹 서버 라이브러리).
+  라이브러리 목록은 둘로 나눴다: `requirements.txt`(분석, dlib 컴파일 10~20분)와 `requirements-api.txt`(웹 서버).
+  웹 쪽만 바뀌면 dlib 단계는 캐시를 재사용해 1~2분이면 빌드된다. 코드는 볼륨으로 연결하므로 고쳐도 다시 빌드할 필요가 없다.
 
   메인 모델 단독 실행(1단계) — Celeb-DF에서 평가 세트를 뺀 진짜·가짜 각 5개:
 
   ```bash
-  wsl docker run --rm -v /mnt/d/Deepfake_Detector_Web/backend:/app -v /mnt/d/Deepfake_Models:/models:ro -v /mnt/d/Deepfake_Datasets:/data:ro deepfake-analysis python -m scripts.run_main_model --celebdf-sample 5
+  docker compose run --rm worker python -m scripts.run_main_model --celebdf-sample 5
   ```
 
-  분석 설정(프레임 수, 이상치 제거 비율, 구간 길이, 경로)은 `backend/analysis/settings.py` 한 곳에 있다.
+  분석 설정(경로, 프레임 수, 이상치 제거 비율, 구간 길이, 판정 임계값, 더미 모드)은 `backend/analysis/settings.py` 한 곳에 있다.
 - 메인 모델은 학습하지 않고 노트북 CPU로 추론만 한다. 학습은 rPPG 특징 기반 로지스틱 회귀/SVM뿐이다.
   데이터셋 전체 특징 추출처럼 분량이 많은 작업만 Colab/Kaggle 무료 GPU를 한시적으로 쓴다.
 

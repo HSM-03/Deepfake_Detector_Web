@@ -2,12 +2,26 @@ import { useState, type FormEvent } from 'react';
 import { getErrorMessage } from '@/api/client';
 import { submitReview } from '@/api/jobs';
 import { formatDateTime } from '@/lib/format';
+import { REVIEW_STATE_META, reviewStateOf } from '@/lib/verdict';
 import type { Review, ReviewDecision } from '@/types/api';
 
 interface Props {
   jobId: string;
-  /** 이미 기록된 판단. 없으면 입력 폼부터 보여 준다 */
+  /** 기록된 판단. 없으면 입력 폼부터 보여 준다 */
   review: Review | null;
+  /** 저장에 성공하면 새 판단을 알린다 (판정 카드의 검토 상태도 함께 바뀌게) */
+  onSaved: (review: Review) => void;
+}
+
+/** 검토 상태 배지: ◆ 검토 대기 / ◆ 추가 검토 필요 / ✓ 검토 완료 */
+function ReviewStateBadge({ review }: { review: Review | null }) {
+  const state = reviewStateOf(review);
+  const meta = REVIEW_STATE_META[state];
+  return (
+    <span className={state === 'reviewed' ? 'review__state review__state--done' : 'review__state'}>
+      {meta.symbol} {meta.label}
+    </span>
+  );
 }
 
 const DECISIONS: Array<{ value: ReviewDecision; label: string }> = [
@@ -22,11 +36,10 @@ const decisionLabel = (decision: ReviewDecision) => DECISIONS.find((d) => d.valu
  * SCR-07 ③ 검토자 최종 판단 기록 — 진짜 / 가짜 / 추가 검토 필요 + 사유 메모.
  * 기록 후에는 읽기 전용 카드와 [수정]으로 바뀐다.
  */
-export function ReviewPanel({ jobId, review }: Props) {
-  const [saved, setSaved] = useState(review);
-  const [editing, setEditing] = useState(review === null);
-  const [decision, setDecision] = useState<ReviewDecision | null>(review?.decision ?? null);
-  const [reason, setReason] = useState(review?.reason ?? '');
+export function ReviewPanel({ jobId, review: saved, onSaved }: Props) {
+  const [editing, setEditing] = useState(saved === null);
+  const [decision, setDecision] = useState<ReviewDecision | null>(saved?.decision ?? null);
+  const [reason, setReason] = useState(saved?.reason ?? '');
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -36,7 +49,7 @@ export function ReviewPanel({ jobId, review }: Props) {
     setSaving(true);
     setError(null);
     try {
-      setSaved(await submitReview(jobId, { decision, reason: reason.trim() }));
+      onSaved(await submitReview(jobId, { decision, reason: reason.trim() }));
       setEditing(false);
     } catch (err) {
       setError(getErrorMessage(err));
@@ -54,15 +67,11 @@ export function ReviewPanel({ jobId, review }: Props) {
   }
 
   if (saved && !editing) {
-    // '추가 검토 필요'로 기록한 건은 이력에서 계속 '재검토'로 남는다
-    const done = saved.decision !== 'needs_more_review';
     return (
       <section className="card stack">
         <div className="review__head">
           <h2 className="section-title">검토자 최종 판단</h2>
-          <span className={done ? 'review__state review__state--done' : 'review__state'}>
-            {done ? '✓ 검토 완료' : '◆ 재검토'}
-          </span>
+          <ReviewStateBadge review={saved} />
         </div>
         <dl className="review__summary">
           <div>
@@ -93,11 +102,11 @@ export function ReviewPanel({ jobId, review }: Props) {
     <form className="card stack" onSubmit={handleSubmit}>
       <div className="review__head">
         <h2 className="section-title">검토자 최종 판단 기록</h2>
-        {!saved && <span className="review__state">◆ 재검토</span>}
+        <ReviewStateBadge review={saved} />
       </div>
       <p className="muted">
-        시스템은 판단을 보류했습니다. 근거를 검토한 뒤 최종 판단을 기록하면 이력의 상태가 '재검토'에서 '검토 완료'로
-        바뀝니다.
+        시스템은 판단을 보류했습니다. 근거를 검토한 뒤 진짜·가짜로 기록하면 이력의 상태가 '검토 완료'로 바뀝니다. 결론을
+        내리기 어려우면 '추가 검토 필요'로 기록해 두세요.
       </p>
       <fieldset className="review__choices" disabled={saving}>
         <legend>판단</legend>

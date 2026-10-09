@@ -19,6 +19,7 @@ import type {
   StageState,
   StageStatus,
 } from '@/types/api';
+import { reviewStateOf } from '@/lib/verdict';
 import { mulberry32 } from './random';
 import { SCENARIOS, THRESHOLDS, type ScenarioKey, type ScoredTemplate } from './scenarios';
 
@@ -176,11 +177,14 @@ function seed() {
       started_at: now - (3 + i * 1.5) * DAY - Math.round(rand() * 8 * HOUR),
       speed: 1,
       canceled_at: null,
-      // 보류 건 하나는 이미 검토 완료 상태로 둔다
+      // 보류 건 셋의 검토 상태를 하나씩 다르게 둔다: job-hold-0003은 검토 대기,
+      // 이 중 하나(i=3)는 검토 완료, 다른 하나(i=12)는 추가 검토 필요
       review:
         scenario === 'hold' && i === 3
           ? { decision: 'fake', reason: '원본 출처 확인 결과 합성본으로 판명', reviewed_at: iso(now - 2 * DAY) }
-          : null,
+          : scenario === 'hold' && i === 12
+            ? { decision: 'needs_more_review', reason: '원본 영상 확보 후 다시 판단', reviewed_at: iso(now - 1 * DAY) }
+            : null,
       jitter: { model: j(), rppg: j(), sqi: j() },
     });
   }
@@ -392,7 +396,7 @@ export function toListItem(record: JobRecord): JobListItem {
     item.p_rppg = result.p_rppg;
     item.sqi = result.sqi.value;
     if (result.result_type === 'hold') {
-      item.review_state = result.review && result.review.decision !== 'needs_more_review' ? 'reviewed' : 'pending';
+      item.review_state = reviewStateOf(result.review);
     }
   }
   return item;

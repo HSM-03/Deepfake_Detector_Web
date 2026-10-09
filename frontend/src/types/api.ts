@@ -323,8 +323,13 @@ export interface EvidenceResponse {
 /** 이력 테이블의 판정 표시 종류: ■가짜 □진짜 ◆보류 ×불가 ◐진행 (+취소) */
 export type VerdictKind = 'real' | 'fake' | 'hold' | 'failed' | 'running' | 'canceled';
 
-/** 보류 건의 검토 상태: 재검토(pending) → 검토 완료(reviewed). 보류가 아니면 none */
-export type ReviewState = 'none' | 'pending' | 'reviewed';
+/**
+ * 보류 건의 검토 상태. 보류가 아니면 none
+ * - pending: 검토 대기 — 아직 검토 기록이 없음
+ * - needs_more_review: 추가 검토 필요 — 검토자가 '추가 검토 필요'로 기록함
+ * - reviewed: 검토 완료 — 검토자가 진짜·가짜로 결론을 냄
+ */
+export type ReviewState = 'none' | 'pending' | 'needs_more_review' | 'reviewed';
 
 export interface JobListItem {
   job_id: string;
@@ -354,7 +359,7 @@ export interface JobListQuery {
   to?: string;
   /** SQI 하한 */
   sqi_min?: number;
-  /** 보류 건 검토 상태 필터 ('재검토' 필터) */
+  /** 보류 건 검토 상태 필터 (검토 대기 / 추가 검토 필요 / 검토 완료) */
   review?: Exclude<ReviewState, 'none'>;
   /** 1부터 */
   page?: number;

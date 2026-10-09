@@ -15,6 +15,30 @@ EFFNB4_WEIGHTS = MODEL_DIR / 'effnb4_best.pth'
 DLIB_LANDMARKS = MODEL_DIR / 'shape_predictor_81_face_landmarks.dat'
 CELEBDF_DIR = DATASET_DIR / 'Celeb-DF-v2'
 
+# ── 더미 분석 ──
+# 켜져 있으면 워커가 실제 모델 대신 미리 정한 예시 값을 돌려주고, 해석 문장·단계 로그 앞에 '[더미]'를 붙인다.
+# 백엔드 골격(2단계)용이다. 실제 메인 모델을 붙이는 3단계에서 끈다: 환경변수 USE_DUMMY_ANALYSIS=false
+USE_DUMMY_ANALYSIS = os.environ.get('USE_DUMMY_ANALYSIS', 'true').strip().lower() in ('1', 'true', 'yes', 'on')
+# 더미 모드에서 단계마다 걸리는 시간(초). 진행 화면을 확인할 수 있을 만큼만 기다린다 (합계 약 12초)
+DUMMY_STAGE_SECONDS = {'preprocess': 4.0, 'model': 5.0, 'rppg': 6.0, 'fusion': 2.0}
+
+# ── 분석 불가 조건 (상세제안서 기능 6) ──
+# 영상 길이가 이보다 짧으면 분석하지 않는다 (30fps 기준 300프레임)
+MIN_DURATION_SEC = 10.0
+
+# ── 융합 판정 (상세제안서 기능 6) ──
+# S = (1 − w)·P_model + w·P_rppg,  w = α·SQI
+# 아래 값은 전부 예시다. 5단계에서 Celeb-DF 검증 세트로 확정한다. 프론트엔드 목(frontend/src/mocks/scenarios.ts)과 같은 값이다
+ALPHA = 0.5  # w = α·SQI
+SCORE_REAL_MAX = 0.4  # S가 이 값 이하면 진짜
+SCORE_FAKE_MIN = 0.6  # S가 이 값 이상이면 가짜
+CONFLICT_GAP = 0.4  # |P_model − P_rppg|가 이 값 이상이면 두 축이 상충
+SQI_MIN = 0.5  # SQI 하한. 미만이면 'rPPG 기여도 낮음'
+SQI_GOOD_MIN = 0.7  # SQI 등급: 이 값 이상 '양호', SQI_MIN 이상 '보통', 그 아래 '낮음'
+# 미결정: S가 경계 구간(SCORE_REAL_MAX < S < SCORE_FAKE_MIN)인데 두 축이 상충하지 않을 때의 판정.
+# 문서에 정의가 없어 프론트엔드 목과 같게 '진짜'로 둔 예시값이다. 'real' 또는 'fake'
+BOUNDARY_VERDICT = 'real'
+
 # ── 메인 모델 (기능 3) ──
 # 영상에서 고르게 뽑을 프레임 수. DeepfakeBench 전처리 기본값(32)과 같게 둔다
 MAIN_MODEL_NUM_FRAMES = 32

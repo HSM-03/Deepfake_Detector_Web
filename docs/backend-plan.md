@@ -115,6 +115,38 @@ API 형식을 바꿔야 할 것 같으면 바꾸기 전에 사용자에게 알�
 - docker compose로 API·워커·Redis를 한 번에 실행
 - 완료 기준: 프론트를 `VITE_USE_MOCK=false`로 바꿔 업로드 → 진행 → 결과 → 이력 흐름이 실제 백엔드로 동작.
 
+#### 2단계 결과 (2026-10-09 완료)
+- 구성 (실행 방법은 루트 `CLAUDE.md`):
+
+  | 위치 | 내용 |
+  |---|---|
+  | `docker-compose.yml` | Redis + API 서버(FastAPI, 8000번) + 워커(Celery, 한 번에 작업 1개). DB·업로드 영상은 Docker 볼륨 `app-data` |
+  | `backend/requirements-api.txt` | FastAPI, uvicorn, python-multipart, SQLAlchemy, Celery, redis. dlib이 든 `requirements.txt`와 나눠 빌드 시간을 줄임 |
+  | `backend/app/` | `api.py`(API 7개), `schemas.py`(= `frontend/src/types/api.ts`), `models.py`·`db.py`(SQLite 테이블 5개, WAL), `progress.py`(Redis 진행률), `tasks.py`(5단계 작업), `worker.py`, `serializers.py`, `config.py` |
+  | `backend/analysis/` | `fusion.py`(융합 판정 규칙), `video_meta.py`(영상 정보), `dummy.py`(더미 시나리오), `settings.py`에 임계값·더미 설정 추가 |
+
+- 확인한 것: 프론트엔드를 목 없이 붙여 화면 7개(업로드·진행·결과·근거·분석 불가·판단 보류·이력)가 모두 실제 백엔드로 동작.
+  취소(대기 중·진행 중), 삭제(단건·일괄, 진행 중 포함), 검토 저장·수정, 이력 필터 전부, 오류 응답(404·409·422) 확인.
+- 정한 것:
+  - **더미 모드**(`USE_DUMMY_ANALYSIS`, 기본 켜짐): 점수는 파일명 키워드로 고른 예시 값(`fake` / `hold` / `fail`·`noface` / `lowsqi`, 그 외 진짜).
+    해석 문장·단계 로그·분석 불가 제목 앞에 `[더미]`. 판정은 더미 점수에도 실제 규칙(`fusion.py`)을 적용한다.
+  - 더미 모드에서도 업로드·검증은 실제로 한다: 열 수 없으면 '파일 손상', 10초 미만이면 '길이 부족'으로 분석 불가.
+  - 미결정인 "S 0.4~0.6 + 비상충" 판정은 `settings.BOUNDARY_VERDICT = 'real'`(프론트 목과 같은 예시값).
+  - 진행 중 기록은 Redis, 끝난 작업의 상태·로그는 DB(`jobs.stages`, `jobs.logs`). 판정에 쓴 임계값을 결과와 함께 저장한다.
+  - 이력 저장을 끈 작업은 DB에 남기되 이력 목록에서 뺀다. 이력 기간 필터는 UTC 날짜 기준(프론트 목과 같음).
+  - 진행 중인 작업을 삭제하면 먼저 취소 표시를 남겨, 워커가 지워진 작업에 쓰지 않고 멈추게 한다.
+  - 리포트 PDF는 빈 1쪽 PDF(자리만). PDF 라이브러리는 나중에 정한다.
+  - 테이블 구조를 바꾸면 개발 중에는 `docker compose down -v`로 볼륨을 지우고 새로 만든다(마이그레이션 도구 없음).
+- 진행하며 바꾼 것:
+  - 판단 보류의 검토 상태를 셋으로 나눔: '재검토' → **검토 대기**(기록 없음) / **추가 검토 필요** / **검토 완료**.
+    API `ReviewState`에 `needs_more_review` 추가(`api.ts` → 목 → 백엔드 함께 수정).
+  - 워커 로그에 단계 시작·완료·최종 상태를 한 줄씩 남기도록 함(`docker compose logs -f worker`로 진행을 볼 수 있게).
+  - 브라우저로 녹화한 WebM은 프레임률이 저장되지 않아 OpenCV가 1000fps·프레임 수를 엉뚱하게 알려 준다.
+    `video_meta.py`가 이 경우 프레임을 직접 세어 계산하도록 고침(11초 영상이 1000fps → 28.8fps).
+- 3단계로 넘길 것:
+  - `analysis/main_model.py`의 프레임 뽑기도 fps·프레임 수를 OpenCV 값 그대로 쓴다. 실제 모델을 연결할 때 `video_meta.py`와 같은 방식으로 바꾼다.
+- 나중에 정할 것: 자동 정리(업로드 원본 보관 기간 — 화면설계서 UC-15, 이력 저장을 끈 작업·취소된 작업 정리). Celery beat로 새 라이브러리 없이 가능.
+
 ### 3단계 — 메인 모델 연결
 - 1단계 스크립트를 워커의 메인 모델 단계에 연결한다.
 - 완료 기준: 실제 영상을 올리면 화면에 실제 P_model과 구간 프로파일이 표시됨.

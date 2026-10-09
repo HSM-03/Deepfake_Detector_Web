@@ -1,4 +1,5 @@
 import { useEffect, useState, type FormEvent } from 'react';
+import { REVIEW_STATE_META } from '@/lib/verdict';
 import type { HistoryQuery } from './historyQuery';
 
 interface Props {
@@ -84,8 +85,11 @@ export function FilterBar({ query, onChange, filtered, onReset }: Props) {
         검토 상태
         <select className="input" value={query.review ?? ''} onChange={(e) => onChange({ review: e.target.value || null })}>
           <option value="">전체</option>
-          <option value="pending">재검토</option>
-          <option value="reviewed">검토 완료</option>
+          {(Object.keys(REVIEW_STATE_META) as Array<keyof typeof REVIEW_STATE_META>).map((state) => (
+            <option key={state} value={state}>
+              {REVIEW_STATE_META[state].label}
+            </option>
+          ))}
         </select>
       </label>
 

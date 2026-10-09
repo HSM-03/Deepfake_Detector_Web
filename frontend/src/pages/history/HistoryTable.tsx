@@ -3,7 +3,7 @@ import { ProgressBar } from '@/components/common/ProgressBar';
 import { VerdictBadge } from '@/components/common/VerdictBadge';
 import { formatDateTime, formatScore } from '@/lib/format';
 import { pathForJob } from '@/lib/paths';
-import { verdictKindOf } from '@/lib/verdict';
+import { REVIEW_STATE_META, verdictKindOf } from '@/lib/verdict';
 import type { JobListItem } from '@/types/api';
 
 interface Props {
@@ -22,8 +22,7 @@ function statusText(item: JobListItem): string {
   if (isActive(item)) return `진행 중 ${item.progress}%`;
   if (item.state === 'failed') return '분석 불가';
   if (item.state === 'canceled') return '취소됨';
-  if (item.review_state === 'pending') return '재검토';
-  if (item.review_state === 'reviewed') return '검토 완료';
+  if (item.review_state !== 'none') return REVIEW_STATE_META[item.review_state].label;
   return '완료';
 }
 
