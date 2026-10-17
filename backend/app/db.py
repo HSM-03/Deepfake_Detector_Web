@@ -2,12 +2,14 @@
 SQLite 연결과 테이블 생성.
 
 API 서버와 워커가 같은 DB 파일을 동시에 쓰므로 WAL 모드를 켠다.
-테이블은 시작할 때 없는 것만 만든다(create_all). 구조를 바꾸면 개발 중에는 볼륨을 지우고 새로 만든다:
+테이블은 시작할 때 없는 것만 만든다(create_all). 칸을 추가만 할 때는 _ADDED_COLUMNS에 적으면 시작할 때 붙인다.
+그 밖에 구조를 바꾸면(칸 삭제·이름 변경 등) 개발 중에는 볼륨을 지우고 새로 만든다:
   docker compose down -v
 
 확인용 실행(컨테이너 안): python -m app.db
 """
 from sqlalchemy import create_engine, event, inspect, text
+from sqlalchemy.exc import OperationalError
 from sqlalchemy.orm import DeclarativeBase, sessionmaker
 
 from . import config
@@ -46,6 +48,32 @@ def init_db() -> None:
     config.DATA_DIR.mkdir(parents=True, exist_ok=True)
     config.UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
     Base.metadata.create_all(engine)
+    _add_missing_columns()
+
+
+# 테이블을 만든 뒤에 추가한 칸: (테이블, 칸, SQL 타입). create_all은 이미 있는 테이블에 칸을 붙이지 않으므로,
+# 없으면 ALTER TABLE로 붙인다. 이렇게 하면 칸을 늘릴 때 볼륨을 지우지(down -v) 않아도 된다
+_ADDED_COLUMNS = [
+    ('jobs', 'face_frames_sampled', 'INTEGER'),
+    ('jobs', 'face_frames_detected', 'INTEGER'),
+]
+
+
+def _add_missing_columns() -> None:
+    """
+    _ADDED_COLUMNS 중 없는 칸을 붙인다. API 서버와 워커가 동시에 켜지면 둘 다 같은 칸을 붙이려 할 수 있다.
+    먼저 붙인 쪽이 이기고, 늦은 쪽은 '이미 있는 칸' 오류를 받는데 그 오류는 무시하고 넘어간다.
+    """
+    for table, column, sql_type in _ADDED_COLUMNS:
+        existing = {c['name'] for c in inspect(engine).get_columns(table)}
+        if column in existing:
+            continue
+        try:
+            with engine.begin() as connection:
+                connection.execute(text(f'ALTER TABLE {table} ADD COLUMN {column} {sql_type}'))
+        except OperationalError as error:
+            if 'duplicate column name' not in str(error).lower():
+                raise
 
 
 def _print_status() -> None:

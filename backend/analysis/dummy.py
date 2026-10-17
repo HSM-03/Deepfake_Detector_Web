@@ -1,5 +1,5 @@
 """
-더미 분석 값 — 백엔드 골격(2단계)에서 실제 모델 대신 쓴다. settings.USE_DUMMY_ANALYSIS가 켜져 있을 때만 쓴다.
+더미 분석 값 — 실제 분석을 붙이기 전에 대신 쓴다. settings.USE_DUMMY_MAIN_MODEL / USE_DUMMY_RPPG가 켜져 있을 때만 쓴다.
 
 프론트엔드 목(frontend/src/mocks/scenarios.ts, evidence.ts)과 같은 시나리오 5종을 파이썬으로 옮겼다.
 파일명에 fake / hold / fail(noface) / lowsqi가 있으면 그 시나리오, 아니면 '진짜'.
@@ -129,10 +129,70 @@ def scenario_from_filename(filename: str) -> str:
     return 'real'
 
 
-def build_evidence(job_id: str, s: ScoredScenario, roi: str, fps: float, duration: float,
-                   w: float, axis_text: str, low_contribution: bool) -> dict:
+@dataclass
+class MainModelValues:
+    """메인 모델 축의 값. 더미(dummy_main_model)와 실제(3단계, main_model.py) 모두 이 모양으로 넘긴다"""
+
+    p_model: float
+    p_model_std: float
+    # 구간별 점수 [{t_start, t_end, p}]. None이면 build_evidence가 p_model 둘레로 그림용 값을 만든다(더미)
+    profile: list[dict] | None = None
+
+
+@dataclass
+class RppgValues:
+    """rPPG 축의 값 (4단계 전까지는 더미)"""
+
+    p_rppg: float
+    sqi: float
+    sqi_components: dict
+    roi_bpm: dict  # 추정 실패는 None
+    features: list[dict]
+    periodicity: float  # 근거 파형의 주기성 0~1 (차트 모양용)
+    noise: float  # 근거 파형의 잡음 크기
+
+
+# rPPG 값을 바꾸는 키워드 시나리오. 'failed'(얼굴 미검출)는 메인 모델 쪽 실패라 여기서는 쓰지 않는다
+_RPPG_KEYWORD_SCENARIOS = ('fake', 'hold', 'low_sqi')
+
+
+def dummy_main_model(filename: str) -> MainModelValues:
+    """더미 메인 모델 값: 파일 이름 키워드로 고른 시나리오의 P_model ('failed'는 호출하는 쪽에서 먼저 걸러야 한다)"""
+    s = SCENARIOS[scenario_from_filename(filename)]
+    return MainModelValues(p_model=s.p_model, p_model_std=s.p_model_std)
+
+
+def rppg_follows_model(filename: str) -> bool:
+    """키워드가 없어 더미 P_rppg가 P_model을 그대로 따라가는지 (해석 문장에서 그렇게 밝힌다)"""
+    return scenario_from_filename(filename) not in _RPPG_KEYWORD_SCENARIOS
+
+
+def dummy_rppg(filename: str, p_model: float) -> RppgValues:
     """
-    판정 근거 상세(SCR-04) 응답 하나 (api.ts EvidenceResponse). 파형·스펙트럼은 주기성·잡음 값으로 합성한 그림용 값이다.
+    더미 rPPG 값.
+    - 파일 이름에 키워드(fake / hold / lowsqi)가 있으면 그 시나리오의 rPPG 값 — 판단 보류·신호 품질 낮음 화면 확인용
+    - 키워드가 없으면 P_rppg = P_model로 둔다. 그러면 S = P_model이고 두 축 차이가 0이라 판정이 메인 모델과 같다
+      (더미 rPPG가 실제 메인 모델의 판정을 바꾸지 않게). SQI·심박·특징·파형은 '진짜' 시나리오 값을 쓴다
+    """
+    key = scenario_from_filename(filename)
+    s = SCENARIOS[key if key in _RPPG_KEYWORD_SCENARIOS else 'real']
+    return RppgValues(
+        p_rppg=s.p_rppg if key in _RPPG_KEYWORD_SCENARIOS else p_model,
+        sqi=s.sqi,
+        sqi_components=s.sqi_components,
+        roi_bpm=s.roi_bpm,
+        features=s.features,
+        periodicity=s.periodicity,
+        noise=s.noise,
+    )
+
+
+def build_evidence(job_id: str, roi: str, fps: float, duration: float, main: MainModelValues, rppg: RppgValues,
+                   w: float, axis_text: str, low_contribution: bool, axis_text_prefix: str = DUMMY_PREFIX) -> dict:
+    """
+    판정 근거 상세(SCR-04) 응답 하나 (api.ts EvidenceResponse).
+    rPPG 부분(파형·스펙트럼·윈도우 BPM)은 주기성·잡음 값으로 합성한 그림용 값이다(4단계 전까지).
+    메인 모델 구간 프로파일은 main.profile이 있으면 그대로(실제), 없으면 합성한다(더미).
     같은 작업·부위면 항상 같은 값이 나오도록 작업 ID로 난수 시드를 정한다.
     """
     seed = int(hashlib.sha256(f'{job_id}:{roi}'.encode()).hexdigest()[:8], 16)
@@ -140,44 +200,46 @@ def build_evidence(job_id: str, s: ScoredScenario, roi: str, fps: float, duratio
     fs = round(fps) or 30
     duration = min(duration or 20.0, 20.0)
 
-    valid = [b for b in s.roi_bpm.values() if b is not None]
-    bpm = float(np.mean(valid)) if roi == 'all' else s.roi_bpm.get(roi)
+    valid = [b for b in rppg.roi_bpm.values() if b is not None]
+    bpm = float(np.mean(valid)) if roi == 'all' else rppg.roi_bpm.get(roi)
     hz = (bpm or 0) / 60
-    amp = 0.0 if bpm is None else s.periodicity
+    amp = 0.0 if bpm is None else rppg.periodicity
 
     # 원신호: 느린 밝기 변동 + 맥파 + 잡음 / 필터 후: 느린 변동 제거
     t = np.arange(int(duration * fs)) / fs
     pulse = amp * np.sin(2 * np.pi * hz * t)
     drift = 0.8 * np.sin(2 * np.pi * 0.08 * t) + 0.3 * np.sin(2 * np.pi * 0.21 * t)
-    raw = pulse + drift + s.noise * 0.5 * rng.uniform(-1, 1, t.size)
-    filtered = pulse + s.noise * 0.22 * rng.uniform(-1, 1, t.size)
+    raw = pulse + drift + rppg.noise * 0.5 * rng.uniform(-1, 1, t.size)
+    filtered = pulse + rppg.noise * 0.22 * rng.uniform(-1, 1, t.size)
 
     # 파워 스펙트럼: 바닥 잡음 + 심박 피크 (주기성이 약하면 여러 개의 작은 봉우리)
     freqs = np.round(np.arange(0, 5.0001, 0.05), 2)
-    power = 0.04 + 0.03 * rng.random(freqs.size) + 0.12 * s.noise * np.exp(-freqs / 1.5) * rng.random(freqs.size)
+    power = 0.04 + 0.03 * rng.random(freqs.size) + 0.12 * rppg.noise * np.exp(-freqs / 1.5) * rng.random(freqs.size)
     power += amp**2 * np.exp(-((freqs - hz) ** 2) / (2 * 0.06**2))
-    if s.periodicity < 0.5:
+    if rppg.periodicity < 0.5:
         for lump_hz, lump_power in zip(0.8 + rng.random(4) * 3, 0.1 + rng.random(4) * 0.25):
-            power += lump_power * s.noise * np.exp(-((freqs - lump_hz) ** 2) / (2 * 0.12**2))
+            power += lump_power * rppg.noise * np.exp(-((freqs - lump_hz) ** 2) / (2 * 0.12**2))
     band = (freqs >= HR_BAND[0]) & (freqs <= HR_BAND[1])
     top = int(np.flatnonzero(band)[np.argmax(power[band])])
     peak = None if bpm is None else {'hz': float(freqs[top]), 'bpm': round(float(freqs[top]) * 60), 'power': round(float(power[top]), 4)}
 
     # 3초 윈도우 BPM (1초 간격)
-    spread = 1.5 if s.periodicity >= 0.5 else 22
+    spread = 1.5 if rppg.periodicity >= 0.5 else 22
     window_bpm = [
         {'t_start': start, 'bpm': None if bpm is None else round(bpm + spread * rng.uniform(-1, 1))}
         for start in range(0, int(duration - 3) + 1)
     ]
 
-    # 메인 모델 구간별 프로파일 (2초 구간)
-    model_profile = []
-    start = 0.0
-    while start < duration:
-        end = min(start + 2, duration)
-        p = float(np.clip(s.p_model + s.p_model_std * 1.2 * rng.uniform(-1, 1), 0, 1))
-        model_profile.append({'t_start': round(start, 2), 't_end': round(end, 2), 'p': round(p, 3)})
-        start = end
+    # 메인 모델 구간별 프로파일: 실제 값이 있으면 그대로, 없으면 2초 구간으로 합성
+    model_profile = main.profile
+    if model_profile is None:
+        model_profile = []
+        start = 0.0
+        while start < duration:
+            end = min(start + 2, duration)
+            p = float(np.clip(main.p_model + main.p_model_std * 1.2 * rng.uniform(-1, 1), 0, 1))
+            model_profile.append({'t_start': round(start, 2), 't_end': round(end, 2), 'p': round(p, 3)})
+            start = end
 
     return {
         'job_id': job_id,
@@ -188,11 +250,14 @@ def build_evidence(job_id: str, s: ScoredScenario, roi: str, fps: float, duratio
         'psd': [{'hz': float(f), 'power': round(float(p), 4)} for f, p in zip(freqs, power)],
         'hr_band': list(HR_BAND),
         'peak': peak,
-        'roi_bpm': s.roi_bpm,
+        'roi_bpm': rppg.roi_bpm,
         'roi_bpm_std': round(float(np.std(valid)), 1) if len(valid) >= 2 else None,
         'window_bpm': window_bpm,
         'model_profile': model_profile,
-        'features': s.features,
-        'axis_summary': {'p_model': s.p_model, 'p_rppg': s.p_rppg, 'w': w, 'sqi': s.sqi, 'text': DUMMY_PREFIX + axis_text},
+        'features': rppg.features,
+        'axis_summary': {
+            'p_model': round(main.p_model, 3), 'p_rppg': round(rppg.p_rppg, 3), 'w': w, 'sqi': rppg.sqi,
+            'text': axis_text_prefix + axis_text,
+        },
         'rppg_low_contribution': low_contribution,
     }

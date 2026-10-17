@@ -8,6 +8,9 @@
   # Celeb-DF에서 평가 세트(List_of_testing_videos.txt)를 뺀 영상 중 진짜 N개·가짜 N개를 골라 실행
   python -m scripts.run_main_model --celebdf-sample 5
 
+  # 직접 찍은 영상 확인 (얼굴 검출률이 MAIN_MODEL_MIN_FACE_RATE보다 낮으면 '기준 미달'로 표시), 진행률 알림도 출력
+  python -m scripts.run_main_model /app/out/my_webcam.webm --progress
+
   # 결과를 JSON으로도 저장 (얼굴 이미지는 저장하지 않는다)
   python -m scripts.run_main_model --celebdf-sample 5 --json /app/out/main_model.json
 """
@@ -64,6 +67,9 @@ def main() -> int:
     parser.add_argument('--frames', type=int, default=settings.MAIN_MODEL_NUM_FRAMES, help='영상당 뽑을 프레임 수')
     parser.add_argument('--json', type=Path, help='결과를 저장할 JSON 경로')
     parser.add_argument('--profile', action='store_true', help='영상마다 구간별 프로파일도 출력')
+    parser.add_argument('--progress', action='store_true', help='진행률 알림(전처리·메인 모델)을 받는 대로 출력')
+    parser.add_argument('--detect-max-side', type=int, default=settings.MAIN_MODEL_DETECT_MAX_SIDE, metavar='PX',
+                        help=f'얼굴 찾기 때 프레임 긴 변 최대 크기 (기본 {settings.MAIN_MODEL_DETECT_MAX_SIDE}, 0이면 원본 그대로)')
     args = parser.parse_args()
 
     videos = [resolve(v) for v in args.videos]
@@ -75,9 +81,14 @@ def main() -> int:
     started = time.perf_counter()
     model = MainModel()
     print(f'모델·얼굴 검출기 불러오기: {time.perf_counter() - started:.1f}초')
-    print(f'영상 {len(videos)}개, 영상당 프레임 {args.frames}장, 이상치 제거 위·아래 각 {settings.MAIN_MODEL_TRIM_RATIO:.0%}\n')
+    print(f'영상 {len(videos)}개, 영상당 프레임 {args.frames}장, 이상치 제거 위·아래 각 {settings.MAIN_MODEL_TRIM_RATIO:.0%},'
+          f' 얼굴 검출률 기준 {settings.MAIN_MODEL_MIN_FACE_RATE:.0%}(예시),'
+          f' 얼굴 찾기 최대 크기 {args.detect_max_side or "원본"}\n')
 
-    header = f'{"영상":<36} {"정답":<3} {"P_model":>7} {"표준편차":>7} {"얼굴":>6} {"길이":>6}  시간(디코딩/얼굴/모델/합계 초)'
+    # 얼굴: 잡힌 수/뽑은 수. 없음/탈락: 얼굴을 못 찾은 수/찾았지만 재검출에서 버린 수. 크기: 검출된 얼굴 상자 평균(px)
+    # 재시도: 줄인 사본에서 못 찾아 원본에서 다시 찾은 프레임 수. 밝기: 뽑은 프레임 평균 (0~255)
+    header = (f'{"영상":<36} {"정답":<3} {"P_model":>7} {"표준편차":>7} {"얼굴":>6} {"없음/탈락":>9} {"크기":>9}'
+              f' {"재시도":>4} {"밝기":>4} {"길이":>6}  시간(디코딩/얼굴/모델/합계 초)')
     print(header)
     print('-' * len(header.encode('utf-8')))
 
@@ -85,7 +96,8 @@ def main() -> int:
     for path in videos:
         name = f'{path.parent.name}/{path.name}'
         try:
-            result = model.analyze(path, args.frames)
+            result = model.analyze(path, args.frames, on_progress=_print_progress if args.progress else None,
+                                   detect_max_side=args.detect_max_side or None)
         except Exception as error:  # 영상 하나가 실패해도 나머지는 계속한다
             print(f'{name:<36} 실패: {error}')
             records.append({'video': name, 'label': label_of(path), 'error': str(error)})
@@ -93,8 +105,13 @@ def main() -> int:
         t = result.timing_sec
         print(
             f'{name:<36} {label_of(path):<3} {fmt(result.p_model):>7} {fmt(result.p_model_std):>7}'
-            f' {result.frames_with_face:>3}/{result.frames_sampled:<2} {result.duration_sec:>5.1f}s'
+            f' {result.frames_with_face:>3}/{result.frames_sampled:<2}'
+            f' {f"{result.stats.frames_no_face}/{result.stats.frames_recheck_failed}":>9}'
+            f' {"×".join(map(str, result.stats.face_box_mean)) if result.stats.face_box_mean else "-":>9}'
+            f' {result.stats.frames_retried_full_res:>5} {result.stats.brightness_mean:>5.0f}'
+            f' {result.duration_sec:>5.1f}s'
             f'  {t["decode"]:.1f} / {t["face"]:.1f} / {t["model"]:.1f} / {t["total"]:.1f}'
+            + ('  ← 얼굴 검출률 기준 미달' if result.face_rate < settings.MAIN_MODEL_MIN_FACE_RATE else '')
         )
         if args.profile:
             print('    구간: ' + ', '.join(f'{s.t_start:g}~{s.t_end:g}s {s.p:.2f}' for s in result.profile))
@@ -107,6 +124,10 @@ def main() -> int:
         args.json.write_text(json.dumps(records, ensure_ascii=False, indent=2))
         print(f'\nJSON 저장: {args.json}')
     return 0
+
+
+def _print_progress(stage: str, percent: int) -> None:
+    print(f'    진행률 {stage}: {percent}%', flush=True)
 
 
 def _print_summary(records: list[dict]) -> None:

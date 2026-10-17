@@ -44,6 +44,11 @@ class Job(Base):
     frame_count: Mapped[int | None] = mapped_column(Integer, default=None)
     codec: Mapped[str | None] = mapped_column(String(16), default=None)
 
+    # 메인 모델 얼굴 검출 통계 — 전처리 단계에서 채운다(완료·판단 보류·분석 불가 모두). 검출률 = 잡힌 수 / 뽑은 수.
+    # 3단계에서 추가한 칸이라, 예전 DB에는 init_db가 칸을 붙인다(db.py _ADDED_COLUMNS)
+    face_frames_sampled: Mapped[int | None] = mapped_column(Integer, default=None)
+    face_frames_detected: Mapped[int | None] = mapped_column(Integer, default=None)
+
     # 끝난 작업의 단계별 상태와 로그 (api.ts StageStatus[], JobLogEntry[]). 진행 중에는 Redis 값이 우선이다
     stages: Mapped[list | None] = mapped_column(JSON, default=None)
     logs: Mapped[list | None] = mapped_column(JSON, default=None)

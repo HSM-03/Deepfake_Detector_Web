@@ -51,5 +51,6 @@ def health() -> dict:
     return {
         'status': 'ok',
         'redis': redis_ok,
-        'dummy_analysis': analysis_settings.USE_DUMMY_ANALYSIS,
+        'dummy_main_model': analysis_settings.USE_DUMMY_MAIN_MODEL,
+        'dummy_rppg': analysis_settings.USE_DUMMY_RPPG,
     }

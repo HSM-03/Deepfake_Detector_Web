@@ -16,11 +16,20 @@ DLIB_LANDMARKS = MODEL_DIR / 'shape_predictor_81_face_landmarks.dat'
 CELEBDF_DIR = DATASET_DIR / 'Celeb-DF-v2'
 
 # ── 더미 분석 ──
-# 켜져 있으면 워커가 실제 모델 대신 미리 정한 예시 값을 돌려주고, 해석 문장·단계 로그 앞에 '[더미]'를 붙인다.
-# 백엔드 골격(2단계)용이다. 실제 메인 모델을 붙이는 3단계에서 끈다: 환경변수 USE_DUMMY_ANALYSIS=false
-USE_DUMMY_ANALYSIS = os.environ.get('USE_DUMMY_ANALYSIS', 'true').strip().lower() in ('1', 'true', 'yes', 'on')
+# 켜져 있으면 실제 분석 대신 미리 정한 예시 값(dummy.py)을 쓰고, 해당 문구 앞에 '[더미]'를 붙인다. 환경변수로 켜고 끈다.
+def _env_flag(name: str, default: bool) -> bool:
+    return os.environ.get(name, str(default)).strip().lower() in ('1', 'true', 'yes', 'on')
+
+
+# 메인 모델 점수(P_model, 구간 프로파일). 3단계에서 실제 EfficientNet-B4를 붙여 기본으로 끈다.
+# 켜면(USE_DUMMY_MAIN_MODEL=true) 모델 없이 화면만 확인할 수 있다(파일 이름 키워드 fail·noface도 이때만 동작)
+USE_DUMMY_MAIN_MODEL = _env_flag('USE_DUMMY_MAIN_MODEL', False)
+# rPPG 점수·SQI·ROI 심박·근거 차트. rPPG 파이프라인을 붙이는 4단계까지 켜 둔다.
+# 파일 이름에 키워드(hold, lowsqi, fake)가 없으면 P_rppg = P_model로 두어 판정을 바꾸지 않는다(dummy.dummy_rppg)
+USE_DUMMY_RPPG = _env_flag('USE_DUMMY_RPPG', True)
 # 더미 모드에서 단계마다 걸리는 시간(초). 진행 화면을 확인할 수 있을 만큼만 기다린다 (합계 약 12초)
-DUMMY_STAGE_SECONDS = {'preprocess': 4.0, 'model': 5.0, 'rppg': 6.0, 'fusion': 2.0}
+# rppg_after_main: 메인 모델이 실제일 때, 메인 모델이 끝난 뒤 더미 rPPG를 채우는 시간
+DUMMY_STAGE_SECONDS = {'preprocess': 4.0, 'model': 5.0, 'rppg': 6.0, 'fusion': 2.0, 'rppg_after_main': 2.0}
 
 # ── 분석 불가 조건 (상세제안서 기능 6) ──
 # 영상 길이가 이보다 짧으면 분석하지 않는다 (30fps 기준 300프레임)
@@ -50,3 +59,19 @@ MAIN_MODEL_BATCH_SIZE = 32
 MAIN_MODEL_TRIM_RATIO = 0.1
 # 구간별 점수 프로파일의 구간 길이(초) (예시)
 MAIN_MODEL_SEGMENT_SEC = 2.0
+# 메인 모델 분석 불가 기준: 뽑은 프레임 중 얼굴이 잡힌 비율이 이보다 낮으면 '얼굴 미검출'로 분석을 멈춘다 (예시).
+# 80%로 시작했다가 고개를 돌리는 셀카 영상(78.1%)이 탈락해 70%로 낮췄다(3-6). 검출률은 작업마다 DB에 남기므로
+# 분포를 보고 다시 정한다. 메인 모델용 기준이다. rPPG에 필요한 얼굴 기준(연속 추적 등)은 4단계에서 따로 정한다
+MAIN_MODEL_MIN_FACE_RATE = 0.7
+# 얼굴 '찾기'를 할 때 프레임 긴 변의 최대 크기(px). 더 크면 줄인 사본에서 찾고, 못 찾으면 원본에서 다시 찾는다.
+# 1080×1920 휴대폰 영상은 원본에서 찾으면 32장에 약 20초가 걸린다. None이면 줄이지 않는다
+MAIN_MODEL_DETECT_MAX_SIDE = 960
+
+# ── 분석 불가 안내 문구 (판정에는 쓰지 않는다, 예시) ──
+# 찾은 얼굴의 평균 크기가 이보다 작을 때만 '얼굴을 더 크게' 안내를 넣는다(px)
+FACE_SMALL_PX = 100
+# 뽑은 프레임의 평균 밝기(흑백 0~255)가 이보다 낮으면 '영상이 어둡다' 안내를 넣는다
+DARK_BRIGHTNESS = 60
+# 진행률 추정용: 얼굴 한 장을 모델에 넣는 데 걸리는 시간(초). 노트북 CPU 측정값(1단계, 32장 약 18초).
+# 32장을 한 번에 계산해 중간 진행을 알 수 없어서, 경과 시간 ÷ (이 값 × 얼굴 수)로 진행률을 추정한다
+MAIN_MODEL_SEC_PER_FACE = 0.6

@@ -13,12 +13,12 @@ docs/
 frontend/             React 대시보드 (완성). 세부 규칙은 frontend/CLAUDE.md
 backend/
   app/                FastAPI(API 7개) + Celery 워커 + SQLite·Redis — 웹 백엔드
-  analysis/           분석 파이프라인(메인 모델, 얼굴 정렬, 융합 판정, 더미 값). 설정은 analysis/settings.py 한 곳
+  analysis/           분석 파이프라인(메인 모델, 얼굴 정렬, 융합 판정, 해석 문장, 더미 값). 설정은 analysis/settings.py 한 곳
   scripts/            웹 없이 실행하는 분석 스크립트(1단계 메인 모델 단독 실행 등)
 docker-compose.yml    Redis + API 서버 + 워커
 ```
 
-진행 상황은 `docs/backend-plan.md`의 각 단계 아래 "결과"에 기록한다. 지금은 2단계(백엔드 골격, 더미 분석)까지 끝났다.
+진행 상황은 `docs/backend-plan.md`의 각 단계 아래 "결과"에 기록한다. 지금은 3단계(메인 모델 연결)까지 끝났다. rPPG는 아직 더미다.
 
 - **API 형식의 기준은 `frontend/src/types/api.ts`다.** 백엔드 응답은 이 타입과 정확히 맞아야 한다.
   형식을 바꿔야 하면 바꾸기 전에 사용자에게 알리고, 타입 → 목(`frontend/src/mocks/`) → 백엔드를 함께 고친다.
@@ -61,8 +61,11 @@ docker-compose.yml    Redis + API 서버 + 워커
   | `docker compose run --rm api python -m app.db` | DB 파일 위치, WAL 모드, 테이블 목록 확인 |
 
   - API 문서(자동 생성): http://localhost:8000/docs, 상태 확인: http://localhost:8000/api/health
-  - **더미 모드**(`USE_DUMMY_ANALYSIS`, 기본 켜짐): 점수는 파일명 키워드로 고른 예시 값이다(`fake` / `hold` / `fail`·`noface` / `lowsqi`,
-    그 외 진짜). 업로드·검증(파일 손상, 10초 미만)과 융합 판정 규칙은 실제로 동작한다. 실제 모델을 붙이는 3단계에서 끈다.
+  - **메인 모델은 실제**(3단계). 워커가 처음 작업을 받을 때 모델을 한 번 불러 둔다. 영상 1편 약 25~30초.
+  - **rPPG는 더미**(`USE_DUMMY_RPPG`, 기본 켜짐, 4단계에서 끈다): 파일명에 키워드(`fake` / `hold` / `lowsqi`)가 없으면
+    P_rppg = P_model로 두어 판정이 메인 모델 단독 결과와 같다. 키워드가 있으면 더미 시나리오 값(판단 보류·신호 품질 낮음 화면 확인용).
+  - `USE_DUMMY_MAIN_MODEL=true`로 켜면 모델 없이 메인 모델도 더미로 흉내 낸다(이때만 `fail`·`noface` 키워드가 얼굴 미검출로 동작).
+  - 업로드·검증(파일 손상, 10초 미만), 얼굴 검출률 기준(예시 70%), 융합 판정 규칙은 항상 실제로 동작한다.
 - 분석용 이미지는 `backend/Dockerfile`로 만든다(Python 3.10, PyTorch CPU, efficientnet_pytorch, OpenCV, dlib + 웹 서버 라이브러리).
   라이브러리 목록은 둘로 나눴다: `requirements.txt`(분석, dlib 컴파일 10~20분)와 `requirements-api.txt`(웹 서버).
   웹 쪽만 바뀌면 dlib 단계는 캐시를 재사용해 1~2분이면 빌드된다. 코드는 볼륨으로 연결하므로 고쳐도 다시 빌드할 필요가 없다.
@@ -72,6 +75,9 @@ docker-compose.yml    Redis + API 서버 + 워커
   ```bash
   docker compose run --rm worker python -m scripts.run_main_model --celebdf-sample 5
   ```
+
+  직접 찍은 영상은 `backend/out/`(git 제외)에 넣고 `python -m scripts.run_main_model /app/out/파일이름.mp4`로 확인한다.
+  얼굴 검출률·실패 원인·얼굴 크기·밝기가 함께 나온다.
 
   분석 설정(경로, 프레임 수, 이상치 제거 비율, 구간 길이, 판정 임계값, 더미 모드)은 `backend/analysis/settings.py` 한 곳에 있다.
 - 메인 모델은 학습하지 않고 노트북 CPU로 추론만 한다. 학습은 rPPG 특징 기반 로지스틱 회귀/SVM뿐이다.

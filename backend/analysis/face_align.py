@@ -47,11 +47,20 @@ class FaceAligner:
         얼굴을 못 찾으면 None. DeepfakeBench처럼, 자른 이미지에서 얼굴이 다시 검출되지 않아도 None
         (학습 데이터에도 그런 프레임은 들어가지 않았다).
         """
+        return self.align_detail(frame_bgr, size).face
+
+    def align_detail(self, frame_bgr: np.ndarray, size: int = 256, detect_max_side: int | None = None) -> 'AlignResult':
+        """
+        align과 같은 계산. 잘린 얼굴과 함께 실패 이유·검출된 얼굴 크기도 돌려준다 (얼굴 검출 통계용).
+        detect_max_side: 프레임의 긴 변이 이보다 크면 얼굴 '찾기'만 줄인 사본에서 한다(고해상도 휴대폰 영상에서 얼굴 찾기 시간이 크게 준다).
+            찾은 상자를 원본 좌표로 되돌려 랜드마크·정렬은 원본 해상도로 하므로 잘린 얼굴의 화질은 같다.
+            줄인 사본에서 못 찾으면(작은 얼굴이 줄면서 놓친 경우) 원본에서 한 번 더 찾는다.
+        """
         rgb = cv2.cvtColor(frame_bgr, cv2.COLOR_BGR2RGB)
-        faces = self.detector(rgb, 1)
-        if len(faces) == 0:
-            return None
-        face = max(faces, key=lambda rect: rect.width() * rect.height())
+        face, retried = self._detect(rgb, detect_max_side)
+        if face is None:
+            return AlignResult(face=None, status='no_face', retried_full_res=retried)
+        box = (face.width(), face.height())
 
         shape = self.predictor(rgb, face)
         src = np.array([[shape.part(i).x, shape.part(i).y] for i in _KEYPOINT_INDEXES], dtype=np.float32)
@@ -60,8 +69,34 @@ class FaceAligner:
 
         # 원본은 PNG로 저장할 때 BGR로 바꾼 뒤 다시 검출한다. 검출 결과는 같으므로 RGB 그대로 확인한다
         if len(self.detector(cv2.cvtColor(cropped, cv2.COLOR_RGB2BGR), 1)) == 0:
-            return None
-        return cropped
+            return AlignResult(face=None, status='recheck_failed', box=box, retried_full_res=retried)
+        return AlignResult(face=cropped, status='ok', box=box, retried_full_res=retried)
+
+    def _detect(self, rgb: np.ndarray, max_side: int | None) -> tuple['dlib.rectangle | None', bool]:
+        """가장 큰 얼굴 상자(원본 좌표)와, 원본에서 다시 찾았는지 여부"""
+        height, width = rgb.shape[:2]
+        scale = max_side / max(height, width) if max_side else 1.0
+        if scale < 1.0:
+            small = cv2.resize(rgb, (round(width * scale), round(height * scale)), interpolation=cv2.INTER_AREA)
+            faces = self.detector(small, 1)
+            if len(faces) > 0:
+                r = max(faces, key=lambda rect: rect.width() * rect.height())
+                back = dlib.rectangle(round(r.left() / scale), round(r.top() / scale),
+                                      round(r.right() / scale), round(r.bottom() / scale))
+                return back, False
+        faces = self.detector(rgb, 1)
+        if len(faces) == 0:
+            return None, scale < 1.0
+        return max(faces, key=lambda rect: rect.width() * rect.height()), scale < 1.0
+
+
+@dataclass
+class AlignResult:
+    face: np.ndarray | None  # 정렬해 자른 RGB 얼굴. 실패하면 None
+    # 'ok' | 'no_face'(프레임에서 얼굴을 못 찾음) | 'recheck_failed'(찾았지만 자른 뒤 다시 검출되지 않음 — 옆얼굴·가림 등)
+    status: str
+    box: tuple[int, int] | None = None  # 원본 프레임에서 검출된 얼굴 상자 (가로, 세로 px). 못 찾으면 None
+    retried_full_res: bool = False  # 줄인 사본에서 못 찾아 원본 해상도로 다시 찾았으면 True
 
 
 def _target_points(size: int) -> np.ndarray:
