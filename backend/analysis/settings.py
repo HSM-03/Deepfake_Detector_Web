@@ -75,3 +75,26 @@ DARK_BRIGHTNESS = 60
 # 진행률 추정용: 얼굴 한 장을 모델에 넣는 데 걸리는 시간(초). 노트북 CPU 측정값(1단계, 32장 약 18초).
 # 32장을 한 번에 계산해 중간 진행을 알 수 없어서, 경과 시간 ÷ (이 값 × 얼굴 수)로 진행률을 추정한다
 MAIN_MODEL_SEC_PER_FACE = 0.6
+
+# ── rPPG (기능 2·4) — 4단계. 전부 예시값이며 UBFC-rPPG·Celeb-DF 학습/검증 세트로 확정한다 ──
+# 심박 대역 (Hz). 0.7~4Hz = 42~240 BPM. 대역통과 필터와 피크 탐색에 함께 쓴다
+RPPG_BAND_HZ = (0.7, 4.0)
+# Butterworth 차수. 2차 구간(SOS)으로 구현하고 앞뒤로 한 번씩 적용한다(filtfilt — 실제 감쇠는 두 배)
+RPPG_FILTER_ORDER = 4
+# 원신호를 만드는 방식: 'pos'(Wang 2017) 또는 'chrom'(de Haan 2013). UBFC 원본·압축 사본 결과를 보고 정한다
+RPPG_METHOD = 'pos'
+# POS·CHROM이 피부색 정규화에 쓰는 짧은 창 길이(초). 두 논문의 값(약 1.6초)
+RPPG_COMBINE_WINDOW_SEC = 1.6
+# 영상 전체 심박: Welch 구간 길이(초), 50% 겹침. 실제 주파수 해상도 = 1/구간 길이 (10초 → 0.1Hz = 6BPM)
+RPPG_PSD_SEGMENT_SEC = 10.0
+# 스펙트럼 계산 간격(Hz). 0을 덧붙여(zero-padding) 촘촘히 계산하고 피크는 포물선 보간한다. 0.01Hz = 0.6BPM
+RPPG_PSD_GRID_HZ = 0.01
+# 윈도우별 심박: 윈도우 길이와 간격(초). 화면설계서의 3초(해상도 20BPM)에서 바꿨다 — 6초와 8초 중 UBFC 결과로 정한다
+RPPG_WINDOW_SEC = 6.0
+RPPG_WINDOW_STEP_SEC = 1.0
+# SNR(de Haan 2013 방식): 심박 f0 ± 이 폭(Hz) + 2배 주파수 2·f0 ± 아래 폭 안의 파워 ÷ 대역 안 나머지 파워
+RPPG_SNR_HALF_WIDTH_HZ = 0.1
+RPPG_SNR_HARMONIC_HALF_WIDTH_HZ = 0.2
+# 소규모 검증에서 '신호가 잡혔다'고 보는 기준(예시). 정확도가 아니라 신호가 깨끗한 정도다
+RPPG_SIGNAL_SNR_MIN_DB = 3.0
+RPPG_SIGNAL_ROI_STD_MAX_BPM = 5.0

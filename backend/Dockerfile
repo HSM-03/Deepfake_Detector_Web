@@ -15,4 +15,9 @@ RUN pip install --no-cache-dir -r requirements.txt
 COPY requirements-api.txt .
 RUN pip install --no-cache-dir -r requirements-api.txt
 
+# rPPG 라이브러리. mediapipe는 cv2 충돌을 막으려고 의존성 없이(--no-deps) 설치한다
+COPY requirements-rppg.txt .
+RUN pip install --no-cache-dir -r requirements-rppg.txt \
+    && pip install --no-cache-dir --no-deps mediapipe==0.10.21
+
 COPY . .

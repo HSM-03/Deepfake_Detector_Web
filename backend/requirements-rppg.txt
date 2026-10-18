@@ -1,0 +1,9 @@
+# rPPG (4단계): ROI 추적(MediaPipe Face Mesh), 신호 처리 검증
+# mediapipe는 의존성에 opencv-contrib-python이 있어 그대로 설치하면 기존 opencv-python-headless(cv2)를 덮어쓴다.
+# 그래서 mediapipe 자체는 Dockerfile에서 --no-deps로 따로 설치하고, 실제로 필요한 의존성만 여기 적는다.
+absl-py==2.5.1
+attrs==26.1.0
+flatbuffers==25.12.19
+protobuf==4.25.9
+matplotlib==3.10.9
+scipy==1.15.3
