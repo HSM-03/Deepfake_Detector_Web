@@ -1,10 +1,15 @@
 """
 rPPG 특징이 진짜와 가짜를 가를 가능성이 있는지 확인 (docs/backend-plan.md 4단계 B, "가능성 확인"용).
 
-  python -m scripts.check_rppg_separability --pairs 25
+  python -m scripts.check_rppg_separability --pairs 25          # Celeb-DF
+  python -m scripts.check_rppg_separability --ffpp raw          # FaceForensics++ (raw=c0 / c23 / c40)
 
 - Celeb-DF에서 같은 원본에서 나온 진짜-가짜 쌍을 뽑는다. 가짜 'idX_idY_NNNN'은 진짜 'idX_NNNN' 영상에 idY의 얼굴을
   합성한 것이라(프레임 수가 같음) 배경·조명·움직임이 같고 얼굴만 다르다. 둘 다 평가 세트(518개) 밖, 10초 이상, 진짜 원본은 겹치지 않게.
+- FaceForensics++(--ffpp): **rPPG 특징 분석에만 쓴다. 메인 모델·융합·5단계 최종 평가에는 쓰지 않는다.**
+  original 'NNN'과 Deepfakes 'NNN_MMM'(NNN 영상에 MMM의 얼굴을 합성)을 쌍으로 쓴다. 같은 영상이 압축 단계(c0/c23/c40)별로 있어
+  압축 강도에 따른 구분력을 볼 수 있다. 받아 둔 쌍을 전부 쓴다(--pairs·--seed는 Celeb-DF에만 적용).
+- --methods: 원신호 방식(기본은 settings.RPPG_METHOD)
 - --roi: SNR·엔트로피·윈도우 변동을 잴 영역 ('all' 세 영역 합 / 'face' / 'face_skin'). ROI 간 특징은 항상 이마·양 볼 세 영역.
 - 특징(임시 정의 — 4단계 본 구현에서 확정):
     snr_db            추정 심박 기준 SNR (de Haan 방식)
@@ -55,6 +60,17 @@ def pick_pairs(root: Path, n: int, seed: int) -> list[tuple[Path, Path]]:
     return pairs
 
 
+def ffpp_pairs(root: Path, compression: str) -> list[tuple[Path, Path]]:
+    """FF++ original 'NNN' ↔ Deepfakes 'NNN_MMM' (같은 영상을 배경으로 쓴 가짜)"""
+    fakes = sorted((root / 'manipulated_sequences' / 'Deepfakes' / compression / 'videos').glob('*.mp4'))
+    pairs = []
+    for fake in fakes:
+        real = root / 'original_sequences' / 'youtube' / compression / 'videos' / f'{fake.stem.split("_")[0]}.mp4'
+        if real.exists():
+            pairs.append((real, fake))
+    return pairs
+
+
 def bpp(path: Path) -> float:
     meta = read_video_meta(path)
     return path.stat().st_size * 8 / meta.duration_sec / (meta.width * meta.height * meta.fps)
@@ -101,17 +117,24 @@ def main() -> int:
     parser.add_argument('--seed', type=int, default=0)
     parser.add_argument('--bootstrap', type=int, default=2000)
     parser.add_argument('--roi', choices=('all',) + rppg.FACE_KEYS, default=settings.RPPG_PRIMARY_ROI)
+    parser.add_argument('--ffpp', choices=('raw', 'c23', 'c40'), help='Celeb-DF 대신 FaceForensics++의 이 압축 단계로 (rPPG 분석 한정)')
+    parser.add_argument('--methods', nargs='+', choices=('pos', 'chrom'), default=[settings.RPPG_METHOD])
     parser.add_argument('--json', type=Path)
     args = parser.parse_args()
 
-    pairs = pick_pairs(settings.CELEBDF_DIR, args.pairs, args.seed)
-    print(f'쌍 {len(pairs)}개 (시드 {args.seed}), ROI {args.roi}, 윈도우 {settings.RPPG_WINDOW_SEC:g}초, 부트스트랩 {args.bootstrap}회\n')
+    if args.ffpp:
+        pairs = ffpp_pairs(settings.DATASET_DIR / 'FaceForensics++', args.ffpp)
+        source = f'FaceForensics++ {args.ffpp}'
+    else:
+        pairs = pick_pairs(settings.CELEBDF_DIR, args.pairs, args.seed)
+        source = f'Celeb-DF (시드 {args.seed})'
+    print(f'{source}: 쌍 {len(pairs)}개, 방식 {"·".join(args.methods)}, ROI {args.roi}, 윈도우 {settings.RPPG_WINDOW_SEC:g}초, 부트스트랩 {args.bootstrap}회\n')
 
     records = []
     for real, fake in pairs:
         row = {'real': real.name, 'fake': fake.name, 'bpp_real': bpp(real), 'bpp_fake': bpp(fake)}
         traces = {'real': rppg.extract_traces(real), 'fake': rppg.extract_traces(fake)}
-        for method in ('pos', 'chrom'):
+        for method in args.methods:
             for side in ('real', 'fake'):
                 row[f'{method}_{side}'] = {**features(traces[side], method, args.roi), 'tracked': traces[side].tracked_rate}
         records.append(row)
@@ -125,7 +148,7 @@ def main() -> int:
 
     print(f'\n{"방식":<6} {"특징":<17} {"진짜 중앙값":>10} {"가짜 중앙값":>10} {"AUC":>6}  95% 신뢰구간')
     summary = {}
-    for method in ('pos', 'chrom'):
+    for method in args.methods:
         for f in FEATURES:
             real = np.array([r[f'{method}_real'][f] for r in records], dtype=float)
             fake = np.array([r[f'{method}_fake'][f] for r in records], dtype=float)

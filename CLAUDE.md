@@ -34,7 +34,9 @@ docker-compose.yml    Redis + API 서버 + 워커
 | 모델 가중치 (`effnb4_best.pth`, dlib 랜드마크) | `D:\Deepfake_Models` | `/mnt/d/Deepfake_Models` |
 
 코드에서는 경로를 환경변수(`DATASET_DIR`, `MODEL_DIR`)로 받는다.
-**FaceForensics++는 쓰지 않는다**(메인 모델의 학습 데이터). Celeb-DF의 `List_of_testing_videos.txt` 518개는 최종 평가 전용이다.
+**FaceForensics++는 rPPG 특징 분석에만 쓴다. 메인 모델·융합·5단계 최종 평가에는 쓰지 않는다**(메인 모델의 학습 데이터).
+메인 모델은 FF++에 돌리지 않는다. 위치 `D:\Deepfake_Datasets\FaceForensics++`(컨테이너 `/data/FaceForensics++`).
+Celeb-DF의 `List_of_testing_videos.txt` 518개는 최종 평가 전용이다. UBFC-rPPG(정답 심박 있음)는 rPPG 정확도 확인에만 쓴다.
 
 ## 개발 환경
 
@@ -78,6 +80,16 @@ docker-compose.yml    Redis + API 서버 + 워커
 
   직접 찍은 영상은 `backend/out/`(git 제외)에 넣고 `python -m scripts.run_main_model /app/out/파일이름.mp4`로 확인한다.
   얼굴 검출률·실패 원인·얼굴 크기·밝기가 함께 나온다.
+
+  rPPG(4단계, 아직 웹에 연결 전) 스크립트 — 컨테이너 안에서 `python -m scripts.<이름>`:
+
+  | 스크립트 | 하는 일 |
+  |---|---|
+  | `check_dsp` | 직접 구현한 필터·스펙트럼(`analysis/dsp.py`)을 scipy.signal과 비교 |
+  | `run_rppg ubfc` / `run_rppg videos …` | UBFC 정답 대비 심박 오차 / 정답 없는 영상의 SNR·ROI 간 차이 |
+  | `check_rppg_separability [--ffpp raw\|c23\|c40]` | 같은 원본의 진짜-가짜 쌍으로 특징별 구분력(AUC·신뢰구간) |
+  | `rppg_bitrate_sweep` | UBFC를 비트레이트별로 다시 압축해 심박 오차 곡선. ffmpeg가 필요해 일회용 컨테이너에서만 실행(이미지에 넣지 않음) |
+  | `plot_rppg_compression` | 위 결과로 `docs/figures/rppg_compression.png` 그리기 |
 
   분석 설정(경로, 프레임 수, 이상치 제거 비율, 구간 길이, 판정 임계값, 더미 모드)은 `backend/analysis/settings.py` 한 곳에 있다.
 - 메인 모델은 학습하지 않고 노트북 CPU로 추론만 한다. 학습은 rPPG 특징 기반 로지스틱 회귀/SVM뿐이다.

@@ -33,7 +33,7 @@ S = (1 − w)·P_model + w·P_rppg,   w = α·SQI
 | 1 | 메인 모델 단독 추론 스크립트 | 완료 |
 | 2 | 백엔드 골격 (FastAPI·Celery·Redis·SQLite, API 7개) | 완료 |
 | 3 | 실제 메인 모델을 웹 분석에 연결 | 완료 |
-| 4 | rPPG 파이프라인 (ROI 추적, CHROM/POS, 대역통과, Welch, 특징 6개, SQI) | 예정 |
+| 4 | rPPG 파이프라인 (ROI 추적, CHROM/POS, 대역통과, Welch, 특징 6개, SQI) | 진행 중 — 신호 처리·소규모 검증 완료, 웹 연결 전 |
 | 5 | rPPG 분류기 학습, 융합 가중치·임계값 결정, 평가 세트 비교 | 예정 |
 
 단계별 상세 기록은 [`docs/backend-plan.md`](docs/backend-plan.md)에 있습니다.
@@ -109,7 +109,8 @@ docker compose up --build
 
 - **Celeb-DF v2**로 실험·평가합니다. 데이터셋은 이용 약관에 따라 저장소에 포함하지 않으며, 데이터셋 인물 얼굴 이미지도 올리지 않습니다.
   - `List_of_testing_videos.txt`의 518개는 최종 평가에만 씁니다.
-- **FaceForensics++**는 쓰지 않습니다. 메인 모델의 학습 데이터이기 때문입니다.
+- **FaceForensics++**는 rPPG 특징 분석(압축 강도별 비교)에만 씁니다. 메인 모델의 학습 데이터라서 메인 모델·융합·최종 평가에는 쓰지 않습니다.
+- **UBFC-rPPG**(Bobbia et al., 2017)는 정답 심박이 있어 rPPG 정확도 확인에만 씁니다.
 - 메인 모델 가중치와 얼굴 정렬 방식은 [DeepfakeBench](https://github.com/SCLBD/DeepfakeBench)(© 2023 CUHK(SZ), CC BY-NC 4.0)를 따릅니다.
   - `backend/analysis/face_align.py`는 DeepfakeBench 전처리를 옮긴 코드입니다(출처는 파일 머리말에 표기).
   - 가중치 파일은 저장소에 포함하지 않습니다.
