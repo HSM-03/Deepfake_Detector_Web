@@ -28,6 +28,26 @@ ROI_LANDMARKS: dict[str, tuple[int, ...]] = {
 }
 ROI_KEYS = tuple(ROI_LANDMARKS)
 
+# 얼굴 피부 전체 ROI(4단계 A 시험): 얼굴 윤곽 안에서 눈·눈썹·입술을 뺀 영역. 평균에 쓰는 픽셀이 세 ROI보다 훨씬 많다.
+#   'face'      윤곽 − (눈·눈썹, 입술)
+#   'face_skin' 위 영역 중 피부색(YCrCb 범위)인 픽셀만 — 머리카락(앞머리)·그림자·배경을 더 뺀다
+FACE_KEYS = ('face', 'face_skin')
+_FACE_OVAL = (10, 338, 297, 332, 284, 251, 389, 356, 454, 323, 361, 288, 397, 365, 379, 378, 400, 377, 152, 148,
+              176, 149, 150, 136, 172, 58, 132, 93, 234, 127, 162, 21, 54, 103, 67, 109)
+_FACE_EXCLUDE = (
+    # 왼눈+왼눈썹 (사람 기준)
+    (263, 249, 390, 373, 374, 380, 381, 382, 362, 398, 384, 385, 386, 387, 388, 466,
+     276, 283, 282, 295, 285, 300, 293, 334, 296, 336),
+    # 오른눈+오른눈썹
+    (33, 7, 163, 144, 145, 153, 154, 155, 133, 173, 157, 158, 159, 160, 161, 246,
+     46, 53, 52, 65, 55, 70, 63, 105, 66, 107),
+    # 입술 바깥선
+    (61, 146, 91, 181, 84, 17, 314, 405, 321, 375, 291, 409, 270, 269, 267, 0, 37, 39, 40, 185),
+)
+# 피부색 범위 (YCrCb의 Cr·Cb, Chai & Ngan 1999에서 흔히 쓰는 값). 예시값
+_SKIN_CR = (133, 173)
+_SKIN_CB = (77, 127)
+
 # Face Mesh는 내부에서 얼굴을 작게 줄여 보므로, 큰 프레임은 이 크기로 줄여 넣는다(좌표는 0~1 비율이라 원본에 그대로 쓴다)
 _MESH_MAX_SIDE = 640
 
@@ -60,8 +80,8 @@ def extract_traces(video_path, meta: VideoMeta | None = None, on_progress: Calla
         raise ValueError(f'영상을 열 수 없습니다: {path}')
     total = meta.frame_count
 
-    sums = {k: [] for k in ROI_KEYS}
-    counts = {k: [] for k in ROI_KEYS}
+    sums = {k: [] for k in ROI_KEYS + FACE_KEYS}
+    counts = {k: [] for k in ROI_KEYS + FACE_KEYS}
     tracked: list[bool] = []
     cap = cv2.VideoCapture(str(path))
     mesh = mp.solutions.face_mesh.FaceMesh(static_image_mode=False, max_num_faces=1, refine_landmarks=False,
@@ -77,13 +97,23 @@ def extract_traces(video_path, meta: VideoMeta | None = None, on_progress: Calla
             small = cv2.resize(frame, (round(width * scale), round(height * scale)), interpolation=cv2.INTER_AREA) if scale < 1 else frame
             found = mesh.process(cv2.cvtColor(small, cv2.COLOR_BGR2RGB)).multi_face_landmarks
             polygons = {}
+            face = None
             if found:
                 lm = found[0].landmark
+
+                def points(ids):
+                    return np.array([[lm[i].x * width, lm[i].y * height] for i in ids], dtype=np.float32)
+
                 for key, ids in ROI_LANDMARKS.items():
-                    pts = np.array([[lm[i].x * width, lm[i].y * height] for i in ids], dtype=np.float32)
-                    polygons[key] = cv2.convexHull(pts).astype(np.int32)
+                    polygons[key] = cv2.convexHull(points(ids)).astype(np.int32)
+                face = (points(_FACE_OVAL).astype(np.int32),
+                        [cv2.convexHull(points(ids)).astype(np.int32) for ids in _FACE_EXCLUDE])
+                polygons['face'] = face  # 확인용(frame_hook): (윤곽, [뺄 영역…])
             for key in ROI_KEYS:
                 total_bgr, n = _polygon_sum(frame, polygons.get(key))
+                sums[key].append(total_bgr)
+                counts[key].append(n)
+            for key, (total_bgr, n) in zip(FACE_KEYS, _face_sums(frame, face)):
                 sums[key].append(total_bgr)
                 counts[key].append(n)
             tracked.append(bool(found))
@@ -98,7 +128,7 @@ def extract_traces(video_path, meta: VideoMeta | None = None, on_progress: Calla
 
     tracked_arr = np.array(tracked, dtype=bool)
     rgb, pixels = {}, {}
-    for key in ROI_KEYS:
+    for key in ROI_KEYS + FACE_KEYS:
         s = np.array(sums[key], dtype=np.float64)  # (n, 3) BGR 합
         c = np.array(counts[key], dtype=np.float64)
         pixels[key] = c
@@ -127,6 +157,31 @@ def _polygon_sum(frame: np.ndarray, polygon: np.ndarray | None) -> tuple[np.ndar
     if n == 0:
         return np.zeros(3), 0
     return crop[mask > 0].sum(axis=0).astype(np.float64), n
+
+
+def _face_sums(frame: np.ndarray, face) -> list[tuple[np.ndarray, int]]:
+    """얼굴 피부 전체 ROI 두 가지('face', 'face_skin')의 BGR 합과 픽셀 수"""
+    empty = [(np.zeros(3), 0), (np.zeros(3), 0)]
+    if face is None:
+        return empty
+    oval, excludes = face
+    x, y, w, h = cv2.boundingRect(oval)
+    x0, y0 = max(x, 0), max(y, 0)
+    x1, y1 = min(x + w, frame.shape[1]), min(y + h, frame.shape[0])
+    if x1 <= x0 or y1 <= y0:
+        return empty
+    crop = frame[y0:y1, x0:x1]
+    mask = np.zeros(crop.shape[:2], dtype=np.uint8)
+    cv2.fillPoly(mask, [oval - [x0, y0]], 255)
+    for poly in excludes:
+        cv2.fillConvexPoly(mask, poly - [x0, y0], 0)
+    ycrcb = cv2.cvtColor(crop, cv2.COLOR_BGR2YCrCb)
+    skin = cv2.inRange(ycrcb, (0, _SKIN_CR[0], _SKIN_CB[0]), (255, _SKIN_CR[1], _SKIN_CB[1]))
+    out = []
+    for m in (mask, cv2.bitwise_and(mask, skin)):
+        n = int(np.count_nonzero(m))
+        out.append((crop[m > 0].sum(axis=0).astype(np.float64), n) if n else (np.zeros(3), 0))
+    return out
 
 
 def _fill_gaps(values: np.ndarray, valid: np.ndarray) -> np.ndarray:

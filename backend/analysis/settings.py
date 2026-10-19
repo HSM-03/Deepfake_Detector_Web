@@ -81,20 +81,27 @@ MAIN_MODEL_SEC_PER_FACE = 0.6
 RPPG_BAND_HZ = (0.7, 4.0)
 # Butterworth 차수. 2차 구간(SOS)으로 구현하고 앞뒤로 한 번씩 적용한다(filtfilt — 실제 감쇠는 두 배)
 RPPG_FILTER_ORDER = 4
-# 원신호를 만드는 방식: 'pos'(Wang 2017) 또는 'chrom'(de Haan 2013). UBFC 원본·압축 사본 결과를 보고 정한다
-RPPG_METHOD = 'pos'
+# 원신호를 만드는 방식: 'pos'(Wang 2017) 또는 'chrom'(de Haan 2013).
+# UBFC 원본에서는 둘이 같고(영상 단위 오차 약 1.5BPM), 압축 사본에서 CHROM이 덜 나빠 CHROM으로 정했다(4단계, 2026-10-19)
+RPPG_METHOD = 'chrom'
+# 심박·SNR·윈도우 심박을 재는 영역. 'all'(이마·양 볼 세 영역 합) / 'face'(얼굴 윤곽 − 눈·입) / 'face_skin'(+ 피부색 필터).
+# 압축 사본에서 face_skin이 가장 나았고(CHROM 23.6 → 8.7BPM) 원본에서는 차이가 없었다. ROI 간 일치도는 항상 세 영역으로 잰다
+RPPG_PRIMARY_ROI = 'face_skin'
 # POS·CHROM이 피부색 정규화에 쓰는 짧은 창 길이(초). 두 논문의 값(약 1.6초)
 RPPG_COMBINE_WINDOW_SEC = 1.6
 # 영상 전체 심박: Welch 구간 길이(초), 50% 겹침. 실제 주파수 해상도 = 1/구간 길이 (10초 → 0.1Hz = 6BPM)
 RPPG_PSD_SEGMENT_SEC = 10.0
 # 스펙트럼 계산 간격(Hz). 0을 덧붙여(zero-padding) 촘촘히 계산하고 피크는 포물선 보간한다. 0.01Hz = 0.6BPM
 RPPG_PSD_GRID_HZ = 0.01
-# 윈도우별 심박: 윈도우 길이와 간격(초). 화면설계서의 3초(해상도 20BPM)에서 바꿨다 — 6초와 8초 중 UBFC 결과로 정한다
-RPPG_WINDOW_SEC = 6.0
+# 윈도우별 심박: 윈도우 길이와 간격(초). 화면설계서의 3초(해상도 20BPM)에서 바꿨다(설계 변경).
+# UBFC 원본에서 8초가 6초보다 조금 나아(윈도우 오차 2.6 vs 3.0BPM) 8초로 정했다
+RPPG_WINDOW_SEC = 8.0
 RPPG_WINDOW_STEP_SEC = 1.0
 # SNR(de Haan 2013 방식): 심박 f0 ± 이 폭(Hz) + 2배 주파수 2·f0 ± 아래 폭 안의 파워 ÷ 대역 안 나머지 파워
 RPPG_SNR_HALF_WIDTH_HZ = 0.1
 RPPG_SNR_HARMONIC_HALF_WIDTH_HZ = 0.2
-# 소규모 검증에서 '신호가 잡혔다'고 보는 기준(예시). 정확도가 아니라 신호가 깨끗한 정도다
-RPPG_SIGNAL_SNR_MIN_DB = 3.0
-RPPG_SIGNAL_ROI_STD_MAX_BPM = 5.0
+# '신호가 잡혔다'고 보는 기준(예시). 정확도가 아니라 신호가 깨끗한 정도다.
+# UBFC 원본(SNR +2.5~+3.7dB, ROI 간 σ 0.2~0.4)과 압축 사본(−2~−4dB, 6.5~12) 사이의 빈 구간에서 잡았다.
+# 이 기준이면 휴대폰·웹캠 원본(SNR 대부분 0dB 미만)에서도 rPPG가 꺼진다 — 휴대폰이 통과하도록 낮추지는 않는다
+RPPG_SIGNAL_SNR_MIN_DB = 0.0
+RPPG_SIGNAL_ROI_STD_MAX_BPM = 3.0

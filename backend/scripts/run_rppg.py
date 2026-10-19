@@ -63,7 +63,7 @@ def evaluate_ubfc(traces: rppg.RoiTraces, hr_true: np.ndarray) -> dict:
     out = {}
     for method in METHODS:
         for win in WINDOWS:
-            est = rppg.estimate_pulse(traces.rgb['all'], fs, method, win)
+            est = rppg.estimate_pulse(traces.rgb[settings.RPPG_PRIMARY_ROI], fs, method, win)
             errors = []
             for start, bpm in est.window_bpm:
                 a, b = int(round(start * fs)), int(round((start + win) * fs))
@@ -76,10 +76,10 @@ def evaluate_ubfc(traces: rppg.RoiTraces, hr_true: np.ndarray) -> dict:
         for a in range(0, len(hr_true) - clip + 1, clip):
             truth = hr_true[a:a + clip].mean()
             per_roi = {}
-            for key in rppg.ROI_KEYS + ('all',):
+            for key in rppg.ROI_KEYS + (settings.RPPG_PRIMARY_ROI,):
                 e = rppg.estimate_pulse(traces.rgb[key][a:a + clip], fs, method)
                 per_roi[key] = e
-            e_all = per_roi['all']
+            e_all = per_roi[settings.RPPG_PRIMARY_ROI]
             if e_all.bpm is not None:
                 clip_err.append(e_all.bpm - truth)
                 snr_est.append(e_all.snr_db)
@@ -166,23 +166,24 @@ def celebdf_real(root: Path, n: int, seed: int) -> list[Path]:
 
 def run_videos(videos: list[Path], method: str) -> list[dict]:
     records = []
-    print(f'방식 {method}, 윈도우 {settings.RPPG_WINDOW_SEC:g}초. 신호 기준(예시): SNR ≥ {settings.RPPG_SIGNAL_SNR_MIN_DB:g}dB'
+    print(f'방식 {method}, 영역 {settings.RPPG_PRIMARY_ROI}, 윈도우 {settings.RPPG_WINDOW_SEC:g}초. 신호 기준(예시): SNR ≥ {settings.RPPG_SIGNAL_SNR_MIN_DB:g}dB'
           f' 그리고 ROI 간 σ ≤ {settings.RPPG_SIGNAL_ROI_STD_MAX_BPM:g}BPM. 피부: ROI 피부의 평균 밝기(0~255)\n')
-    print(f'{"영상":<34} {"추적":>5} {"피부":>4} {"심박(all)":>9} {"SNR":>6} {"이마":>6} {"왼볼":>6} {"오른볼":>6} {"ROI σ":>6} {"윈도우 σ":>7}  판정')
+    print(f'{"영상":<34} {"추적":>5} {"피부":>4} {"심박":>9} {"SNR":>6} {"이마":>6} {"왼볼":>6} {"오른볼":>6} {"ROI σ":>6} {"윈도우 σ":>7}  판정')
     for path in videos:
         meta = read_video_meta(path)
         if meta is None or meta.duration_sec < settings.MIN_DURATION_SEC:
             print(f'{path.name:<34} 제외 — ' + ('열 수 없음' if meta is None else f'{meta.duration_sec:.1f}초로 너무 짧음'))
             continue
         traces = rppg.extract_traces(path, meta)
-        est = {key: rppg.estimate_pulse(traces.rgb[key], meta.fps, method) for key in rppg.ROI_KEYS + ('all',)}
-        a = est['all']
+        roi = settings.RPPG_PRIMARY_ROI
+        est = {key: rppg.estimate_pulse(traces.rgb[key], meta.fps, method) for key in rppg.ROI_KEYS + (roi,)}
+        a = est[roi]
         roi_bpm = {k: est[k].bpm for k in rppg.ROI_KEYS}
         valid = [b for b in roi_bpm.values() if b is not None]
         roi_std = float(np.std(valid)) if len(valid) >= 2 else float('nan')
         wins = [b for _, b in a.window_bpm if b is not None]
         win_std = float(np.std(wins)) if len(wins) >= 2 else float('nan')
-        brightness = float(traces.rgb['all'].mean())
+        brightness = float(traces.rgb[roi].mean())
         captured = (a.snr_db is not None and a.snr_db >= settings.RPPG_SIGNAL_SNR_MIN_DB
                     and roi_std <= settings.RPPG_SIGNAL_ROI_STD_MAX_BPM)
         name = f'{path.parent.name}/{path.name}'
