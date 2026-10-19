@@ -84,7 +84,7 @@ Celeb-DF의 `List_of_testing_videos.txt` 518개는 최종 평가 전용이다. U
   직접 찍은 영상은 `backend/out/`(git 제외)에 넣고 `python -m scripts.run_main_model /app/out/파일이름.mp4`로 확인한다.
   얼굴 검출률·실패 원인·얼굴 크기·밝기가 함께 나온다.
 
-  rPPG(4단계, 아직 웹에 연결 전) 스크립트 — 컨테이너 안에서 `python -m scripts.<이름>`:
+  rPPG 분석 스크립트(4단계, 웹 없이 실행) — 컨테이너 안에서 `python -m scripts.<이름>`:
 
   | 스크립트 | 하는 일 |
   |---|---|
