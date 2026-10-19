@@ -218,6 +218,7 @@ def _analyze(db, job: Job, tracker: Tracker) -> str:
                     'sqi': result['sqi'], 'text': (p if (dummy_main or dummy_rppg) else '') + axis_text}
     for roi in ROI_SELECTORS:
         job.evidence.append(Evidence(roi=roi, data=result['evidence'](roi, outcome, axis_summary)))
+    tracker.check_canceled()  # 마지막 기록 뒤에 취소됐으면 결과를 남기지 않는다(JobCanceled → rollback)
     db.commit()
     return 'hold' if outcome.verdict == 'hold' else 'done'
 
@@ -242,7 +243,8 @@ def _real_rppg_stage(job: Job, tracker: Tracker, main: dummy.MainModelValues) ->
     quality = sqi.compute(traces, meta.codec, stream_info(path, meta))
     tracker.set('rppg', 100)
     hr = features.hr_bpm
-    weakest = interpret.SQI_COMPONENT_LABELS[quality.weakest]
+    # 네 항목이 모두 1이면 깎은 항목이 없다(로그에 첫 항목 이름이 찍히지 않게)
+    weakest = interpret.SQI_COMPONENT_LABELS[quality.weakest] if quality.value < 1 else '없음'
     tracker.log('rppg', f'rPPG 분석 완료 — 심박 {"측정 실패" if hr is None else f"{hr:.0f}BPM"}, SQI {quality.value:.2f}'
                         f' (가장 약한 항목: {weakest}), 얼굴 추적 {traces.tracked_rate:.0%}'
                         + (f', 영상 {meta.duration_sec:.0f}초 중 앞 {analyzed_sec:.0f}초 분석' if truncated else ''))

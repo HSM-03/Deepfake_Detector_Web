@@ -47,6 +47,18 @@ def _key(job_id: str) -> str:
     return f'job:{job_id}:progress'
 
 
+def _cancel_key(job_id: str) -> str:
+    """
+    취소 표시는 진행 기록과 다른 키에 둔다. 워커는 진행 기록을 '읽고(취소 확인) → 쓰는'데, 같은 키에 두면
+    그 사이에 API가 남긴 취소 표시를 워커가 '진행 중'으로 덮어써 취소가 사라진다(4-4에서 확인). 이 키는 API만 쓴다
+    """
+    return f'job:{job_id}:canceled'
+
+
+def is_canceled(job_id: str) -> bool:
+    return bool(_client.exists(_cancel_key(job_id)))
+
+
 def empty_stages() -> list[dict]:
     return [{'key': key, 'label': label, 'state': 'waiting', 'progress': 0} for key, label, _, _ in STAGES]
 
@@ -66,7 +78,7 @@ def init(job_id: str) -> None:
 
 
 def delete(job_id: str) -> None:
-    _client.delete(_key(job_id))
+    _client.delete(_key(job_id), _cancel_key(job_id))
 
 
 def overall_progress(stages: list[dict]) -> int:
@@ -93,7 +105,7 @@ class Tracker:
     def __init__(self, job_id: str):
         self.job_id = job_id
         self.data = read(job_id) or {'stages': empty_stages(), 'logs': [], 'message': '', 'started_at': None}
-        if self.data.get('state') == 'canceled':  # 워커가 작업을 받기 전에 이미 취소됨
+        if self.data.get('state') == 'canceled' or is_canceled(job_id):  # 워커가 작업을 받기 전에 이미 취소됨
             raise JobCanceled(job_id)
         self.data['state'] = 'running'
         self.data['started_at'] = self.data.get('started_at') or time.time()
@@ -103,8 +115,7 @@ class Tracker:
         return next(s for s in self.data['stages'] if s['key'] == key)
 
     def check_canceled(self) -> None:
-        latest = read(self.job_id)
-        if latest and latest.get('state') == 'canceled':
+        if is_canceled(self.job_id):
             raise JobCanceled(self.job_id)
 
     def _save(self) -> None:
@@ -118,7 +129,10 @@ class Tracker:
         """단계 진행률 갱신 (0이면 시작, 100이면 완료)"""
         stage = self._stage(key)
         before = stage['state']
-        stage['progress'] = max(0, min(100, int(progress)))
+        value = max(0, min(100, int(progress)))
+        if value == stage['progress'] and before != 'waiting':  # 같은 %면 쓰지 않는다(rPPG는 프레임마다 부른다)
+            return
+        stage['progress'] = value
         stage['state'] = 'done' if stage['progress'] >= 100 else 'running'
         self._save()
         if before == 'waiting' and stage['state'] != 'waiting':
@@ -147,8 +161,9 @@ class Tracker:
 def mark_canceled(job_id: str) -> dict:
     """
     취소 표시: 진행 중이던 단계를 '취소됨'으로 바꾸고 저장한 내용을 돌려준다.
-    API의 취소 요청이 부르고(워커는 다음 기록 때 알아채고 멈춘다), 워커도 멈추면서 한 번 더 부른다.
+    API의 취소 요청이 부르고(워커는 다음 기록 때 취소 키를 보고 멈춘다), 워커도 멈추면서 한 번 더 부른다.
     """
+    _client.set(_cancel_key(job_id), '1', ex=_TTL_SECONDS)
     data = read(job_id) or {'stages': empty_stages(), 'logs': [], 'started_at': None}
     for stage in data['stages']:
         if stage['state'] == 'running':

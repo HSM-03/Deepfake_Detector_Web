@@ -18,7 +18,7 @@ backend/
 docker-compose.yml    Redis + API 서버 + 워커
 ```
 
-진행 상황은 `docs/backend-plan.md`의 각 단계 아래 "결과"에 기록한다. 지금은 4단계(rPPG) 진행 중이다 — rPPG 신호 분석은 웹에 연결됐고, P_rppg(분류기)는 5단계까지 임시 값이다.
+진행 상황은 `docs/backend-plan.md`의 각 단계 아래 "결과"에 기록한다. 지금은 4단계(rPPG)까지 끝났다 — rPPG 신호 분석은 웹에 연결됐고, P_rppg(분류기)는 5단계까지 임시 값(P_model)이다.
 
 - **API 형식의 기준은 `frontend/src/types/api.ts`다.** 백엔드 응답은 이 타입과 정확히 맞아야 한다.
   형식을 바꿔야 하면 바꾸기 전에 사용자에게 알리고, 타입 → 목(`frontend/src/mocks/`) → 백엔드를 함께 고친다.

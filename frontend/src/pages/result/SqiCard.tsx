@@ -30,6 +30,8 @@ export function SqiCard({ sqi, thresholds, w, low }: Props) {
   const f = formatScore;
   const percent = (n: number) => `${n * 100}%`;
   const weakest = COMPONENTS.reduce((min, c) => (sqi.components[c.key] < sqi.components[min.key] ? c : min));
+  // 네 항목이 모두 1이면 SQI를 깎은 항목이 없다 — 첫 항목에 "병목"을 붙이지 않는다
+  const hasBottleneck = sqi.components[weakest.key] < 1;
 
   return (
     <section className="card stack">
@@ -72,7 +74,7 @@ export function SqiCard({ sqi, thresholds, w, low }: Props) {
       <ul className="sqi__components">
         {COMPONENTS.map(({ key, label, hint }) => {
           const value = sqi.components[key];
-          const isWeakest = key === weakest.key;
+          const isWeakest = hasBottleneck && key === weakest.key;
           return (
             <li key={key} title={hint} className={isWeakest ? 'sqi__component--weakest' : undefined}>
               <span>
@@ -95,8 +97,14 @@ export function SqiCard({ sqi, thresholds, w, low }: Props) {
         })}
       </ul>
       <p className="caption">
-        구성 요소는 0~1이며 1에 가까울수록 신호를 뽑기 좋은 조건입니다. SQI는 네 항목 중 가장 낮은 값입니다(지금 SQI를 정한
-        항목: <strong>{weakest.label}</strong>).
+        구성 요소는 0~1이며 1에 가까울수록 신호를 뽑기 좋은 조건입니다. SQI는 네 항목 중 가장 낮은 값입니다
+        {hasBottleneck ? (
+          <>
+            (지금 SQI를 정한 항목: <strong>{weakest.label}</strong>).
+          </>
+        ) : (
+          <>(지금은 네 항목 모두 1.00이라 SQI를 깎은 항목이 없습니다).</>
+        )}
       </p>
     </section>
   );
