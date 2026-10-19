@@ -3,7 +3,8 @@
 
   위: UBFC-rPPG 심박 오차(MAE) — rppg_bitrate_sweep.py 결과
   아래: 진짜/가짜 구분력(AUC + 95% 신뢰구간), 특징마다 작은 그림 — check_rppg_separability.py 결과
-        (Celeb-DF 25쌍, FaceForensics++ c0/c23/c40 각 10쌍. FF++는 rPPG 분석 한정)
+        (Celeb-DF, FaceForensics++ c0/c23/c40 — 쌍 개수는 결과 파일에서 읽는다. FF++는 rPPG 분석 한정)
+        주 특징(사전 등록): 윈도우별 심박 변동 — 그림에서 첫 칸
   세로 점선: Celeb-DF bpp 중앙값
 
   python -m scripts.plot_rppg_compression --sweep s.json --celebdf c.json --ffpp raw.json c23.json c40.json \\
@@ -49,9 +50,10 @@ def load(args) -> dict:
     data = {'ubfc': {'h264': curves['h264'], 'mpeg4': curves['mpeg4'],
                      'original': [float(np.mean([r['bpp'] for r in original])), float(np.mean([r['mae'] for r in original]))]},
             'separability': []}
-    sources = [('Celeb-DF (25쌍)', args.celebdf)] + [(f'FF++ {c} (10쌍)', p) for c, p in zip(('c0', 'c23', 'c40'), args.ffpp)]
-    for label, path in sources:
+    sources = [('Celeb-DF', args.celebdf)] + [(f'FF++ {c}', p) for c, p in zip(('c0', 'c23', 'c40'), args.ffpp)]
+    for name, path in sources:
         d = json.loads(Path(path).read_text(encoding='utf-8'))
+        label = f'{name} ({len(d["pairs"])}쌍)'
         bpp = float(np.median([p['bpp_real'] for p in d['pairs']]))
         feats = {f: d['summary'][f'chrom/{f}'] for f in FEATURES}
         data['separability'].append({'source': label, 'bpp': bpp, 'features': feats})
@@ -124,8 +126,10 @@ def plot(data: dict, out: Path, celebdf_bpp: float) -> None:
                 ax.annotate(short, (s['bpp'], 0.04), ha=align, color=MUTED, fontsize=8)
         else:
             ax.tick_params(labelleft=False)
-    fig.text(0.125, 0.455, '진짜/가짜 구분력 — 0.5 = 구분 못 함. 채운 점 = 95% 신뢰구간이 0.5를 벗어남, 빈 점 = 0.5 포함.'
-             '  ■ Celeb-DF 25쌍  ● FaceForensics++ 10쌍 (rPPG 분석 한정)', color=INK, fontsize=10.5)
+    fig.text(0.125, 0.465, '진짜/가짜 구분력 — 0.5 = 구분 못 함. 채운 점 = 95% 신뢰구간이 0.5를 벗어남, 빈 점 = 0.5 포함.'
+             ' 주 특징(사전 등록) = 윈도우별 심박 변동', color=INK, fontsize=10.5)
+    fig.text(0.125, 0.445, '■ Celeb-DF  ● FaceForensics++ (rPPG 분석 한정)   쌍 개수: '
+             + ', '.join(s['source'] for s in data['separability']), color=MUTED, fontsize=9.5)
     out.parent.mkdir(parents=True, exist_ok=True)
     fig.savefig(out, dpi=150, bbox_inches='tight', facecolor=SURFACE)
 
