@@ -13,7 +13,7 @@ from dataclasses import dataclass
 
 import numpy as np
 
-from . import settings
+from . import dsp, settings
 from .rppg import RoiTraces
 from .stream_info import StreamInfo
 
@@ -70,7 +70,35 @@ def measure(traces: RoiTraces, roi: str = settings.RPPG_PRIMARY_ROI) -> dict[str
         'brightness_cv': float(luma.std() / luma.mean()) if len(luma) and luma.mean() > 0 else np.nan,
         'head_motion': head,
         'mouth_motion': mouth,
+        **_inband_lighting(traces, roi),
     }
+
+
+def _inband_lighting(traces: RoiTraces, roi: str) -> dict[str, float]:
+    """
+    필터가 걸러 내지 못하는 심박 대역(0.7~4Hz) 안의 밝기 변화 (조명 항목 후보, 2026-10-20 분포 확인용).
+      background_inband  배경 밝기(평균으로 나눈 상대값)를 rPPG와 같은 대역통과에 통과시킨 표준편차
+      skin_inband        얼굴 피부 밝기를 같은 방식으로 — 맥박 성분도 조금 들어 있다
+      lighting_ratio     background_inband ÷ skin_inband (배경의 대역 내 밝기 변화가 피부 신호에 견줘 얼마나 큰지)
+    """
+    out = {'background_inband': np.nan, 'skin_inband': np.nan, 'lighting_ratio': np.nan}
+    fs = traces.fps
+    sos = dsp.butter_bandpass_sos(settings.RPPG_FILTER_ORDER, *settings.RPPG_BAND_HZ, fs)
+    pad = 3 * (2 * len(sos) + 1)
+
+    def inband(x: np.ndarray) -> float:
+        x = np.asarray(x, dtype=np.float64)
+        if len(x) <= pad or not np.all(np.isfinite(x)) or x.mean() <= 0:
+            return np.nan
+        return float(np.std(dsp.sosfiltfilt(sos, x / x.mean() - 1.0)))
+
+    skin = traces.rgb[roi] @ np.array([0.299, 0.587, 0.114])
+    out['skin_inband'] = inband(skin)
+    if len(traces.background) == len(skin):
+        out['background_inband'] = inband(traces.background)
+    if np.isfinite(out['background_inband']) and out['skin_inband'] and np.isfinite(out['skin_inband']):
+        out['lighting_ratio'] = out['background_inband'] / out['skin_inband']
+    return out
 
 
 def compute(traces: RoiTraces, codec: str, stream: StreamInfo, roi: str = settings.RPPG_PRIMARY_ROI) -> SqiResult:

@@ -65,6 +65,8 @@ class RoiTraces:
     tracked: np.ndarray  # (프레임 수,) 얼굴을 잡았는지
     # 프레임별 얼굴 위치·크기·입 벌림(px, 못 잡은 프레임은 NaN): 'cx', 'cy', 'width', 'height', 'mouth' — SQI 움직임 항목에 쓴다
     geometry: dict[str, np.ndarray] = field(default_factory=dict)
+    # 프레임별 배경 평균 밝기(0~255): 얼굴 상자를 1.6배 넓힌 영역 바깥. 얼굴을 못 잡으면 프레임 전체 — SQI 조명 항목에 쓴다
+    background: np.ndarray = field(default_factory=lambda: np.zeros(0))
 
     @property
     def tracked_rate(self) -> float:
@@ -89,6 +91,7 @@ def extract_traces(video_path, meta: VideoMeta | None = None, on_progress: Calla
     counts = {k: [] for k in ROI_KEYS + FACE_KEYS}
     tracked: list[bool] = []
     geometry: dict[str, list[float]] = {k: [] for k in ('cx', 'cy', 'width', 'height', 'mouth')}
+    background: list[float] = []
     cap = cv2.VideoCapture(str(path))
     mesh = mp.solutions.face_mesh.FaceMesh(static_image_mode=False, max_num_faces=1, refine_landmarks=False,
                                            min_detection_confidence=0.5, min_tracking_confidence=0.5)
@@ -124,6 +127,7 @@ def extract_traces(video_path, meta: VideoMeta | None = None, on_progress: Calla
             else:
                 for values in geometry.values():
                     values.append(np.nan)
+            background.append(_background_luma(small, scale, geometry, bool(found)))
             for key in ROI_KEYS:
                 total_bgr, n = _polygon_sum(frame, polygons.get(key))
                 sums[key].append(total_bgr)
@@ -154,7 +158,20 @@ def extract_traces(video_path, meta: VideoMeta | None = None, on_progress: Calla
     rgb['all'] = _fill_gaps(s_all[:, ::-1] / np.maximum(c_all, 1)[:, None], c_all > 0)
     pixels['all'] = c_all
     return RoiTraces(fps=meta.fps, rgb=rgb, pixels=pixels, tracked=tracked_arr,
-                     geometry={k: np.array(v, dtype=np.float64) for k, v in geometry.items()})
+                     geometry={k: np.array(v, dtype=np.float64) for k, v in geometry.items()},
+                     background=np.array(background, dtype=np.float64))
+
+
+def _background_luma(small: np.ndarray, scale: float, geometry: dict, found: bool) -> float:
+    """얼굴 상자(1.6배로 넓힘) 바깥의 평균 밝기. 줄인 프레임에서 계산한다(밝기 평균이라 해상도 영향이 작다)"""
+    gray = cv2.cvtColor(small, cv2.COLOR_BGR2GRAY)
+    if not found:
+        return float(gray.mean())
+    cx, cy = geometry['cx'][-1] * scale, geometry['cy'][-1] * scale
+    hw, hh = geometry['width'][-1] * scale * 0.8, geometry['height'][-1] * scale * 0.8
+    mask = np.ones(gray.shape, dtype=bool)
+    mask[max(int(cy - hh), 0):max(int(cy + hh), 0), max(int(cx - hw), 0):max(int(cx + hw), 0)] = False
+    return float(gray[mask].mean()) if mask.any() else float(gray.mean())
 
 
 def _polygon_sum(frame: np.ndarray, polygon: np.ndarray | None) -> tuple[np.ndarray, int]:
