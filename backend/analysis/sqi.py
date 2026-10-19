@@ -5,7 +5,7 @@ SQI(신호품질지수, 상세제안서 기능 6) — rPPG 신호를 믿을 만�
 압축이 망가지면 다른 조건이 좋아도 신호가 없으므로 평균으로 합치지 않는다.
   compression   파일 정보(코덱 + 영상 스트림 bpp)로 판단 — 신호(SNR·σ)로 판단하지 않는다(docs/backend-plan.md 4단계)
   face_pixels   얼굴 피부 ROI의 프레임당 평균 픽셀 수
-  illumination  피부 평균 밝기와 프레임 간 밝기 변동 — 둘 중 낮은 쪽
+  illumination  피부 평균 밝기와 배경의 빠른 밝기 변화(심박 대역 0.7~4Hz 안, 조명 깜빡임·카메라 흔들림) — 둘 중 낮은 쪽
   motion        머리 이동과 입·턱 움직임(입 벌림 변화) — 둘 중 낮은 쪽 (화면 문구: "머리·얼굴 움직임")
 기준값은 전부 settings.py의 예시값이다.
 """
@@ -102,16 +102,24 @@ def _inband_lighting(traces: RoiTraces, roi: str) -> dict[str, float]:
 
 
 def compute(traces: RoiTraces, codec: str, stream: StreamInfo, roi: str = settings.RPPG_PRIMARY_ROI) -> SqiResult:
-    m = measure(traces, roi)
-    compression, rule = compression_score(codec, stream.bpp)
+    m = {**measure(traces, roi), 'codec': codec, 'bpp': stream.bpp, 'bpp_source': stream.source}
+    return score(m)
+
+
+def score(m: dict) -> SqiResult:
+    """측정값(measure + codec·bpp)으로 네 항목 점수와 SQI를 낸다. 저장해 둔 측정값으로 다시 계산할 때도 쓴다"""
+    compression, rule = compression_score(m['codec'], m['bpp'])
     face = _ramp(m['face_pixels'], *settings.SQI_FACE_PIXELS, log=True)
     bright = _ramp(m['brightness'], *settings.SQI_BRIGHTNESS)
     if m['brightness'] > settings.SQI_BRIGHTNESS_SATURATION:  # 너무 밝아 피부색이 포화되면 감점
         bright = min(bright, _ramp(m['brightness'], 255.0, settings.SQI_BRIGHTNESS_SATURATION))
-    illumination = min(bright, _ramp(m['brightness_cv'], *settings.SQI_BRIGHTNESS_CV))
+    # 배경의 빠른 밝기 변화(조명 깜빡임·카메라 흔들림) — 심박 대역 안이라 필터가 거르지 못한다. 잴 수 없으면 평균 밝기만 본다
+    flicker = m.get('background_inband')
+    illumination = bright if flicker is None or not np.isfinite(flicker) else \
+        min(bright, _ramp(flicker, *settings.SQI_BACKGROUND_INBAND, log=True))
     motion = min(_ramp(m['head_motion'], *settings.SQI_HEAD_MOTION), _ramp(m['mouth_motion'], *settings.SQI_MOUTH_MOTION))
     components = {'face_pixels': face, 'compression': compression, 'illumination': illumination, 'motion': motion}
     value = min(components.values())
     grade = 'good' if value >= settings.SQI_GOOD_MIN else 'fair' if value >= settings.SQI_MIN else 'poor'
     return SqiResult(value=round(value, 3), grade=grade, components={k: round(v, 3) for k, v in components.items()},
-                     measures={**m, 'codec': codec, 'bpp': stream.bpp, 'bpp_source': stream.source, 'compression_rule': rule})
+                     measures={**m, 'compression_rule': rule})

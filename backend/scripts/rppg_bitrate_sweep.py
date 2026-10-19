@@ -21,7 +21,7 @@ from pathlib import Path
 
 import numpy as np
 
-from analysis import rppg, settings
+from analysis import rppg, settings, sqi
 from analysis.video_meta import read_video_meta
 from scripts.run_rppg import load_ubfc_truth
 
@@ -70,14 +70,18 @@ def evaluate(video: Path, hr: np.ndarray) -> dict:
         clips.append({'truth': truth, settings.RPPG_METHOD: main.bpm,
                       'pos' if settings.RPPG_METHOD == 'chrom' else 'chrom': other.bpm})
     bpp = video.stat().st_size * 8 / meta.duration_sec / (meta.width * meta.height * meta.fps)
+    lighting = sqi.measure(traces)  # 조명 항목 측정값(배경·피부의 심박 대역 안 밝기 변화) — 압축 잡음에 반응하는지 보려고 함께 남긴다
     return {'mae': float(np.mean(err)), 'snr_db': float(np.mean(snr)), 'roi_std': float(np.nanmean(roi_std)), 'bpp': bpp,
-            'clips': clips}
+            'clips': clips, 'background_inband': lighting['background_inband'], 'skin_inband': lighting['skin_inband'],
+            'lighting_ratio': lighting['lighting_ratio']}
 
 
 def main() -> int:
     parser = argparse.ArgumentParser(description='rPPG 압축 강도별 시험 (UBFC-rPPG)')
     parser.add_argument('--root', type=Path, default=settings.DATASET_DIR / 'UBFC-rPPG' / 'DATASET_2')
-    parser.add_argument('--tmp', type=Path, default=Path('/tmp/sweep'))
+    parser.add_argument('--tmp', type=Path, default=Path('/tmp/sweep'), help='압축 사본을 둘 폴더')
+    parser.add_argument('--keep', action='store_true',
+                        help='압축 사본을 지우지 않고 남긴다(판단이 끝날 때까지 보관). 이미 있는 사본은 다시 만들지 않고 쓴다')
     parser.add_argument('--codecs', nargs='+', default=list(CODECS) + ['h264>hevc'],
                         choices=list(CODECS) + ['h264>hevc'])
     parser.add_argument('--json', type=Path)
@@ -90,16 +94,20 @@ def main() -> int:
         _, hr, _ = load_ubfc_truth(folder)
         r = evaluate(folder / 'vid.avi', hr)
         records.append({'subject': folder.name, 'codec': '원본', 'target_kbps': None, 'kbps': None, **r})
-        print(f'{folder.name} 원본(비압축)            bpp {r["bpp"]:7.3f} | MAE {r["mae"]:5.1f} | SNR {r["snr_db"]:5.1f} | ROI σ {r["roi_std"]:5.1f}', flush=True)
+        print(f'{folder.name} 원본(비압축)            bpp {r["bpp"]:7.3f} | MAE {r["mae"]:5.1f} | SNR {r["snr_db"]:5.1f} | ROI σ {r["roi_std"]:5.1f} | 배경 대역내 {r["background_inband"] * 100:.3f}%', flush=True)
         for codec in args.codecs:
             for kbps in BITRATES_KBPS:
                 dst = args.tmp / f'{folder.name}_{codec.replace(">", "-")}_{kbps}.mp4'
-                real = encode(folder / 'vid.avi', dst, codec, kbps)
+                if args.keep and dst.exists():  # 남겨 둔 사본이 있으면 다시 만들지 않는다
+                    real = dst.stat().st_size * 8 / 1000 / read_video_meta(dst).duration_sec
+                else:
+                    real = encode(folder / 'vid.avi', dst, codec, kbps)
                 r = evaluate(dst, hr)
-                dst.unlink()
+                if not args.keep:
+                    dst.unlink()
                 records.append({'subject': folder.name, 'codec': codec, 'target_kbps': kbps, 'kbps': real, **r})
                 print(f'{folder.name} {codec:<9} {kbps:>5}k (실제 {real:5.0f}k) bpp {r["bpp"]:7.3f} | MAE {r["mae"]:5.1f}'
-                      f' | SNR {r["snr_db"]:5.1f} | ROI σ {r["roi_std"]:5.1f}', flush=True)
+                      f' | SNR {r["snr_db"]:5.1f} | ROI σ {r["roi_std"]:5.1f} | 배경 대역내 {r["background_inband"] * 100:.3f}%', flush=True)
 
     print('\n요약 (세 사람 평균)')
     print(f'  {"코덱":<6} {"목표":>6} {"bpp":>6} {"MAE":>6} {"SNR":>6} {"ROI σ":>6}')
