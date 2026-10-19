@@ -19,7 +19,7 @@ const COMPONENTS: Array<{ key: keyof SqiInfo['components']; label: string; hint:
   { key: 'face_pixels', label: '얼굴 크기', hint: '얼굴 영역의 픽셀 수' },
   { key: 'compression', label: '압축 상태', hint: '압축 손상이 적을수록 높음' },
   { key: 'illumination', label: '조명', hint: '밝고 변동이 적을수록 높음' },
-  { key: 'motion', label: '움직임', hint: '머리 움직임이 적을수록 높음' },
+  { key: 'motion', label: '움직임', hint: '머리·얼굴 움직임이 적을수록 높음' },
 ];
 
 /** SCR-03 ③ SQI 카드 — 신호품질지수와 등급, 구성 요소 4개. SQI가 하한 미만이면 경고 */

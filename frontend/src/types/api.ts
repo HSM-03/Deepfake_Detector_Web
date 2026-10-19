@@ -112,11 +112,11 @@ export interface SqiInfo {
   components: {
     /** 얼굴 영역 픽셀 수 */
     face_pixels: number;
-    /** 압축 블록 아티팩트 (1 = 아티팩트 적음) */
+    /** 압축 정도 — 코덱과 영상 스트림의 픽셀당 비트(bpp)로 판단 (1 = 압축 손상 적음) */
     compression: number;
     /** 평균 조도·조도 변동 */
     illumination: number;
-    /** 머리 움직임 (1 = 움직임 적음) */
+    /** 머리·얼굴 움직임 — 머리 이동과 입·턱 움직임 중 큰 쪽 (1 = 움직임 적음) */
     motion: number;
   };
 }

@@ -41,7 +41,7 @@ def _features(hr: str, rows: list[tuple]) -> list[dict]:
         ('snr', '주 피크 SNR', '≥ 3 dB'),
         ('spectral_entropy', '스펙트럼 엔트로피', '≤ 0.60'),
         ('roi_bpm_std', 'ROI 간 심박수 일치도', 'σ ≤ 5 BPM'),
-        ('phase_consistency', 'ROI 간 위상 일관성', '≥ 0.70'),
+        ('phase_consistency', 'ROI 간 신호 일치도(위상 일관성)', '≥ 0.70'),
         ('window_bpm_var', '윈도우별 BPM 변동성', 'σ ≤ 6 BPM'),
     ]
     out = [_feature('hr_in_range', '심박수 생리학적 범위', 1, hr, '45~180 BPM', 'ok')]

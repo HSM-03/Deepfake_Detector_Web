@@ -31,6 +31,7 @@ ROI_KEYS = tuple(ROI_LANDMARKS)
 # 얼굴 피부 전체 ROI(4단계 A 시험): 얼굴 윤곽 안에서 눈·눈썹·입술을 뺀 영역. 평균에 쓰는 픽셀이 세 ROI보다 훨씬 많다.
 #   'face'      윤곽 − (눈·눈썹, 입술)
 #   'face_skin' 위 영역 중 피부색(YCrCb 범위)인 픽셀만 — 머리카락(앞머리)·그림자·배경을 더 뺀다
+#   (코 아래 입·턱을 뺀 영역도 시험했지만 말할 때의 심박 오차가 줄지 않아 넣지 않았다 — 계획서 4단계)
 FACE_KEYS = ('face', 'face_skin')
 _FACE_OVAL = (10, 338, 297, 332, 284, 251, 389, 356, 454, 323, 361, 288, 397, 365, 379, 378, 400, 377, 152, 148,
               176, 149, 150, 136, 172, 58, 132, 93, 234, 127, 162, 21, 54, 103, 67, 109)
@@ -44,6 +45,8 @@ _FACE_EXCLUDE = (
     # 입술 바깥선
     (61, 146, 91, 181, 84, 17, 314, 405, 321, 375, 291, 409, 270, 269, 267, 0, 37, 39, 40, 185),
 )
+# 입 벌림을 잴 윗입술 안쪽(13)·아랫입술 안쪽(14)
+_LIP_INNER = (13, 14)
 # 피부색 범위 (YCrCb의 Cr·Cb, Chai & Ngan 1999에서 흔히 쓰는 값). 예시값
 _SKIN_CR = (133, 173)
 _SKIN_CB = (77, 127)
@@ -60,6 +63,8 @@ class RoiTraces:
     rgb: dict[str, np.ndarray]  # ROI 이름(+ 'all') → (프레임 수, 3) R·G·B 평균
     pixels: dict[str, np.ndarray]  # ROI 이름 → (프레임 수,) 영역 픽셀 수 (SQI의 얼굴 픽셀 수에 쓴다)
     tracked: np.ndarray  # (프레임 수,) 얼굴을 잡았는지
+    # 프레임별 얼굴 위치·크기·입 벌림(px, 못 잡은 프레임은 NaN): 'cx', 'cy', 'width', 'height', 'mouth' — SQI 움직임 항목에 쓴다
+    geometry: dict[str, np.ndarray] = field(default_factory=dict)
 
     @property
     def tracked_rate(self) -> float:
@@ -83,6 +88,7 @@ def extract_traces(video_path, meta: VideoMeta | None = None, on_progress: Calla
     sums = {k: [] for k in ROI_KEYS + FACE_KEYS}
     counts = {k: [] for k in ROI_KEYS + FACE_KEYS}
     tracked: list[bool] = []
+    geometry: dict[str, list[float]] = {k: [] for k in ('cx', 'cy', 'width', 'height', 'mouth')}
     cap = cv2.VideoCapture(str(path))
     mesh = mp.solutions.face_mesh.FaceMesh(static_image_mode=False, max_num_faces=1, refine_landmarks=False,
                                            min_detection_confidence=0.5, min_tracking_confidence=0.5)
@@ -106,9 +112,18 @@ def extract_traces(video_path, meta: VideoMeta | None = None, on_progress: Calla
 
                 for key, ids in ROI_LANDMARKS.items():
                     polygons[key] = cv2.convexHull(points(ids)).astype(np.int32)
-                face = (points(_FACE_OVAL).astype(np.int32),
+                oval = points(_FACE_OVAL)
+                face = (oval.astype(np.int32),
                         [cv2.convexHull(points(ids)).astype(np.int32) for ids in _FACE_EXCLUDE])
                 polygons['face'] = face  # 확인용(frame_hook): (윤곽, [뺄 영역…])
+                (x0, y0), (x1, y1) = oval.min(axis=0), oval.max(axis=0)
+                upper_lip, lower_lip = points(_LIP_INNER)
+                for key, value in (('cx', (x0 + x1) / 2), ('cy', (y0 + y1) / 2), ('width', x1 - x0), ('height', y1 - y0),
+                                   ('mouth', float(np.linalg.norm(lower_lip - upper_lip)))):
+                    geometry[key].append(float(value))
+            else:
+                for values in geometry.values():
+                    values.append(np.nan)
             for key in ROI_KEYS:
                 total_bgr, n = _polygon_sum(frame, polygons.get(key))
                 sums[key].append(total_bgr)
@@ -138,7 +153,8 @@ def extract_traces(video_path, meta: VideoMeta | None = None, on_progress: Calla
     c_all = sum(np.array(counts[k], dtype=np.float64) for k in ROI_KEYS)
     rgb['all'] = _fill_gaps(s_all[:, ::-1] / np.maximum(c_all, 1)[:, None], c_all > 0)
     pixels['all'] = c_all
-    return RoiTraces(fps=meta.fps, rgb=rgb, pixels=pixels, tracked=tracked_arr)
+    return RoiTraces(fps=meta.fps, rgb=rgb, pixels=pixels, tracked=tracked_arr,
+                     geometry={k: np.array(v, dtype=np.float64) for k, v in geometry.items()})
 
 
 def _polygon_sum(frame: np.ndarray, polygon: np.ndarray | None) -> tuple[np.ndarray, int]:
@@ -160,8 +176,8 @@ def _polygon_sum(frame: np.ndarray, polygon: np.ndarray | None) -> tuple[np.ndar
 
 
 def _face_sums(frame: np.ndarray, face) -> list[tuple[np.ndarray, int]]:
-    """얼굴 피부 전체 ROI 두 가지('face', 'face_skin')의 BGR 합과 픽셀 수"""
-    empty = [(np.zeros(3), 0), (np.zeros(3), 0)]
+    """얼굴 피부 전체 ROI 세 가지(FACE_KEYS 순서)의 BGR 합과 픽셀 수"""
+    empty = [(np.zeros(3), 0)] * len(FACE_KEYS)
     if face is None:
         return empty
     oval, excludes = face

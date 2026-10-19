@@ -30,7 +30,7 @@ from pathlib import Path
 
 import numpy as np
 
-from analysis import rppg, settings
+from analysis import rppg, rppg_features, settings
 from analysis.video_meta import read_video_meta
 
 FEATURES = ('snr_db', 'spectral_entropy', 'roi_bpm_std', 'roi_corr', 'window_bpm_std')
@@ -76,23 +76,15 @@ def bpp(path: Path) -> float:
     return path.stat().st_size * 8 / meta.duration_sec / (meta.width * meta.height * meta.fps)
 
 
+# 이 스크립트의 결과 파일(JSON)에 쓰는 특징 이름 → 서비스 특징 이름(API FeatureKey). 계산은 analysis.rppg_features 한 곳에서 한다
+FEATURE_NAMES = {'snr_db': 'snr', 'spectral_entropy': 'spectral_entropy', 'roi_bpm_std': 'roi_bpm_std',
+                 'roi_corr': 'phase_consistency', 'window_bpm_std': 'window_bpm_var'}
+
+
 def features(traces: rppg.RoiTraces, method: str, roi: str) -> dict:
-    est = {k: rppg.estimate_pulse(traces.rgb[k], traces.fps, method) for k in rppg.ROI_KEYS + (roi,)}
-    a = est[roi]
-    band = (a.freqs >= settings.RPPG_BAND_HZ[0]) & (a.freqs <= settings.RPPG_BAND_HZ[1])
-    p = a.psd[band] / a.psd[band].sum()
-    entropy = float(-(p * np.log(p + 1e-20)).sum() / np.log(len(p)))
-    bpms = [est[k].bpm for k in rppg.ROI_KEYS if est[k].bpm is not None]
-    sig = [est[k].filtered for k in rppg.ROI_KEYS]
-    corr = [np.corrcoef(sig[i], sig[j])[0, 1] for i in range(3) for j in range(i + 1, 3)]
-    wins = [b for _, b in a.window_bpm if b is not None]
-    return {
-        'snr_db': a.snr_db if a.snr_db is not None else np.nan,
-        'spectral_entropy': entropy,
-        'roi_bpm_std': float(np.std(bpms)) if len(bpms) >= 2 else np.nan,
-        'roi_corr': float(np.mean(corr)),
-        'window_bpm_std': float(np.std(wins)) if len(wins) >= 2 else np.nan,
-    }
+    """서비스와 같은 함수(rppg_features.compute)로 계산하고, 이전 결과 파일과 같은 이름으로 돌려준다"""
+    values = rppg_features.compute(traces, method, roi).values
+    return {name: values[key] for name, key in FEATURE_NAMES.items()}
 
 
 def auc(real: np.ndarray, fake: np.ndarray) -> float:

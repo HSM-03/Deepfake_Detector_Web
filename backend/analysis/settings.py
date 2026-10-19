@@ -105,3 +105,28 @@ RPPG_SNR_HARMONIC_HALF_WIDTH_HZ = 0.2
 # 이 기준이면 휴대폰·웹캠 원본(SNR 대부분 0dB 미만)에서도 rPPG가 꺼진다 — 휴대폰이 통과하도록 낮추지는 않는다
 RPPG_SIGNAL_SNR_MIN_DB = 0.0
 RPPG_SIGNAL_ROI_STD_MAX_BPM = 3.0
+# 특징 'hr_in_range'의 생리학적 심박 범위(BPM). 예시
+RPPG_HR_RANGE_BPM = (45.0, 180.0)
+
+# ── SQI(신호품질지수, 기능 6) — 4단계. 네 항목(각 0~1) 중 가장 낮은 값이 SQI다(가장 약한 고리). 기준값은 전부 예시 ──
+# 압축: 영상 스트림 bpp(픽셀당 비트, analysis/stream_info.py)를 코덱별 (0점 bpp, 1점 bpp) 사이에서 로그 눈금으로 0~1.
+# 근거는 UBFC 비트레이트 단계별 시험(H.264·MPEG-4만). 나머지 코덱은 시험하지 않았다 — 근거 없음, 보수적 기본값
+SQI_COMPRESSION_BPP = {
+    'h264': (0.02, 0.10),  # 0.016 → 오차 15BPM, 0.053 → 4.1, 0.11 → 2.0
+    'mpeg4': (0.06, 0.13),  # 0.056 → 21, 0.10 → 4.2, 0.13 → 2.0
+}
+# 시험하지 않은 코덱 → 적용할 기준. HEVC·VP9·AV1은 같은 bpp에서 H.264보다 효율이 좋아 H.264 기준이 보수적이다.
+# VP8과 목록에 없는 코덱은 가장 엄격한 MPEG-4 기준. 무압축은 항상 1점
+SQI_CODEC_RULE = {'h264': 'h264', 'h265': 'h264', 'hevc': 'h264', 'vp9': 'h264', 'av1': 'h264', 'av01': 'h264',
+                  'mpeg4': 'mpeg4', 'vp8': 'mpeg4'}
+SQI_CODEC_DEFAULT_RULE = 'mpeg4'
+SQI_LOSSLESS_CODECS = ('rawvideo', 'raw', 'ffv1', 'huffyuv', '')  # ''는 FourCC가 비어 있는 비압축 AVI(UBFC 원본 등)
+# 얼굴 크기: 얼굴 피부 ROI의 프레임당 평균 픽셀 수 (0점, 1점), 로그 눈금
+SQI_FACE_PIXELS = (2_500, 40_000)
+# 조명: 피부 평균 밝기(0~255) (0점, 1점)과 포화(이 값 이상이면 감점 시작, 255에서 0), 프레임 간 밝기 변동계수 (0점, 1점)
+SQI_BRIGHTNESS = (40.0, 100.0)
+SQI_BRIGHTNESS_SATURATION = 230.0
+SQI_BRIGHTNESS_CV = (0.10, 0.02)
+# 움직임: 프레임당 얼굴 중심 이동(얼굴 폭 대비), 프레임당 입 벌림 변화(얼굴 높이 대비) (0점, 1점). 둘 중 낮은 쪽
+SQI_HEAD_MOTION = (0.03, 0.005)
+SQI_MOUTH_MOTION = (0.02, 0.003)
