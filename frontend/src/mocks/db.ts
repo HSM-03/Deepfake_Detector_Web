@@ -339,6 +339,7 @@ export function buildResult(record: JobRecord): JobResultResponse | null {
     p_model: s.p_model,
     p_model_std: t.p_model_std,
     p_rppg: s.p_rppg,
+    p_rppg_provisional: false, // 목 시나리오는 P_rppg가 따로 있다
     w: s.w,
     sqi: { value: s.sqi, grade: sqiGrade(s.sqi), components: t.sqi_components },
     roi_bpm: t.roi_bpm,

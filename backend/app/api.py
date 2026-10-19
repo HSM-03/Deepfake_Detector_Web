@@ -118,7 +118,12 @@ def job_evidence(
     row = next((e for e in job.evidence if e.roi == roi), None)
     if row is None:
         raise HTTPException(409, '근거 데이터가 없는 작업입니다(분석 불가·진행 중·취소)')
-    return row.data
+    # 4-3 이전에 저장된 근거에는 아래 칸이 없다 — 예전 결과도 열리도록 채워 준다
+    data = dict(row.data)
+    data.setdefault('p_rppg_provisional', bool(job.result and job.result.p_rppg_provisional))
+    data.setdefault('rppg_analyzed_sec', float(job.duration_sec or 0.0))
+    data.setdefault('rppg_truncated', False)
+    return data
 
 
 @router.post('/jobs/{job_id}/review', response_model=s.Review, summary='검토자 최종 판단 기록 (SCR-07)')

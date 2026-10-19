@@ -30,7 +30,7 @@ export function FeatureTab({ evidence }: Props) {
   const hasConflictSource = features.some((feature) => feature.conflict_source);
   const summary = [
     { ...TERMS.pModel, value: axis.p_model },
-    { ...TERMS.pRppg, value: axis.p_rppg },
+    { ...TERMS.pRppg, value: axis.p_rppg, note: evidence.p_rppg_provisional ? '임시: 메인 모델 값' : undefined },
     { ...TERMS.sqi, value: axis.sqi },
     { ...TERMS.w, value: axis.w },
   ];
@@ -53,8 +53,8 @@ export function FeatureTab({ evidence }: Props) {
             <tr>
               <th scope="col">특징</th>
               <th scope="col">측정값</th>
-              {/* 기준값은 Celeb-DF 학습 세트의 진짜 영상 분포로 산출해 확정한다. 확정되면 '(예시)'와 아래 안내를 지운다 */}
-              <th scope="col">실제 얼굴 기준 (예시)</th>
+              {/* 지금 기준값은 신호가 좋았던 영상 10편으로 잡은 임시값이다(docs/backend-plan.md 4-3). 5단계에서 재산출하면 바꾼다 */}
+              <th scope="col">임시 기준</th>
               <th scope="col">판단</th>
             </tr>
           </thead>
@@ -79,7 +79,7 @@ export function FeatureTab({ evidence }: Props) {
           </tbody>
         </table>
         <p className="caption">
-          기준값은 아직 예시입니다. Celeb-DF 학습 세트의 진짜 영상 분포로 산출해 확정할 예정입니다.
+          임시 기준입니다 — 신호가 좋았던 영상 10편으로 잡았고, 5단계에서 학습용 진짜 영상으로 다시 산출합니다.
         </p>
       </section>
 
@@ -91,11 +91,19 @@ export function FeatureTab({ evidence }: Props) {
               <dt>
                 {item.label} <span className="term">{item.term}</span>
               </dt>
-              <dd>{f(item.value)}</dd>
+              <dd>
+                {f(item.value)}
+                {'note' in item && item.note && <small className="axis-summary__note"> ({item.note})</small>}
+              </dd>
             </div>
           ))}
         </dl>
         <p>{axis.text}</p>
+        {evidence.p_rppg_provisional && (
+          <p className="warn-box">
+            <span aria-hidden="true">ⓘ </span>P_rppg 분류기 미적용(5단계 예정) — 임시로 메인 모델 값 사용. 그래서 종합 점수 S도 사실상 메인 모델 단독 값입니다.
+          </p>
+        )}
       </section>
     </div>
   );

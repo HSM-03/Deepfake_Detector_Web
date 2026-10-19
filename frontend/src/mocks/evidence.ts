@@ -100,5 +100,8 @@ export function buildEvidence(record: JobRecord, t: ScoredTemplate, roi: RoiSele
     features: t.features,
     axis_summary,
     rppg_low_contribution: axis_summary.sqi < THRESHOLDS.sqi_min,
+    p_rppg_provisional: false,
+    rppg_analyzed_sec: t.video.duration_sec,
+    rppg_truncated: false,
   };
 }

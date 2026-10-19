@@ -74,6 +74,8 @@ class Result(Base):
     w: Mapped[float] = mapped_column(Float)
     axis_gap: Mapped[float] = mapped_column(Float)  # |P_model − P_rppg|
     rppg_low_contribution: Mapped[bool] = mapped_column(Boolean)  # SQI < 하한
+    # P_rppg가 분류기 없이 임시로 P_model 값을 쓴 결과인지(5단계 전). 4단계에서 추가한 칸(db.py _ADDED_COLUMNS)
+    p_rppg_provisional: Mapped[bool] = mapped_column(Boolean, default=False)
     sqi: Mapped[float] = mapped_column(Float)
     sqi_grade: Mapped[str] = mapped_column(String(8))  # 'good' | 'fair' | 'poor'
     sqi_components: Mapped[dict] = mapped_column(JSON)  # face_pixels, compression, illumination, motion

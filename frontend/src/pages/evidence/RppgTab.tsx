@@ -61,6 +61,13 @@ export function RppgTab({ evidence, loading }: Props) {
 
   return (
     <div className="evidence-grid">
+      {evidence.rppg_truncated && (
+        <p className="warn-box evidence-grid__wide">
+          <span aria-hidden="true">ⓘ </span>
+          <strong>앞 {Math.round(evidence.rppg_analyzed_sec)}초 분석</strong> — 긴 영상은 처리 시간 때문에 rPPG를 앞{' '}
+          {Math.round(evidence.rppg_analyzed_sec)}초만 분석합니다. 메인 모델은 영상 전체에서 프레임을 뽑습니다.
+        </p>
+      )}
       <ChartCard
         title="필터 전 원신호"
         term="RGB → CHROM"

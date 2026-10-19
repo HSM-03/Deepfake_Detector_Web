@@ -152,5 +152,8 @@ RPPG_FEATURE_JUDGE = {
     'phase_consistency': ('min', 0.40, 0.20),  # 좋은 영상 중앙 0.43, Celeb-real 0.14
     'window_bpm_var': ('max', 8.0, 12.0),  # 좋은 영상 75% 8.7BPM, Celeb-real 중앙 12.2
 }
+# rPPG는 모든 프레임을 처리해 영상 길이에 비례해 오래 걸리므로(1080p 30초에 약 17초) 앞 이 길이만 분석한다.
+# 업로드 길이 제한은 없다(용량 500MB만). 메인 모델은 영상 전체에서 32프레임을 그대로 뽑는다
+RPPG_MAX_ANALYSIS_SEC = 60.0
 # 근거 화면 파형 차트에 보낼 최대 길이(초). 길면 응답이 커진다
 RPPG_EVIDENCE_MAX_SEC = 60.0

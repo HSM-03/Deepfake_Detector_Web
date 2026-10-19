@@ -4,7 +4,7 @@ import { TERMS } from '@/lib/terms';
 import type { DoneResult } from '@/types/api';
 
 interface Props {
-  result: Pick<DoneResult, 'score' | 'p_model' | 'p_rppg' | 'w' | 'sqi' | 'thresholds'>;
+  result: Pick<DoneResult, 'score' | 'p_model' | 'p_rppg' | 'p_rppg_provisional' | 'w' | 'sqi' | 'thresholds'>;
 }
 
 /**
@@ -47,6 +47,11 @@ export function ScoreFormula({ result }: Props) {
         </div>
       </div>
       <p className="formula">S = (1 − w)·P_model + w·P_rppg</p>
+      {result.p_rppg_provisional && (
+        <p className="warn-box">
+          <span aria-hidden="true">ⓘ </span>P_rppg 분류기 미적용(5단계 예정) — 임시로 메인 모델 값 사용. 그래서 위 식의 S도 사실상 메인 모델 단독 값입니다.
+        </p>
+      )}
 
       <div className="stack weight">
         <p className="weight__title">

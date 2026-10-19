@@ -59,7 +59,8 @@ def _measured_sentence(outcome: FusionOutcome, sqi: float, measured: dict) -> st
     if outcome.rppg_low_contribution:
         return (f'rPPG 신호 품질이 낮아(SQI {sqi:.2f}, 가장 약한 항목: {weakest}) rPPG는 판정에 반영되지 않았습니다.')
     hr = measured.get('hr')
-    found = f'rPPG 신호에서 심박 약 {hr:.0f}BPM을 측정했습니다' if hr is not None else 'rPPG 신호에서 심박을 찾지 못했습니다'
+    where = f'앞 {measured["truncated_sec"]:.0f}초의 ' if measured.get('truncated_sec') else ''
+    found = f'{where}rPPG 신호에서 심박 약 {hr:.0f}BPM을 측정했습니다' if hr is not None else f'{where}rPPG 신호에서 심박을 찾지 못했습니다'
     return (f'{found}(신호 품질 SQI {sqi:.2f}). rPPG의 진짜/가짜 점수는 분류기(5단계)를 붙이기 전이라 '
             '메인 모델 값으로 두어 판정에 영향을 주지 않습니다.')
 

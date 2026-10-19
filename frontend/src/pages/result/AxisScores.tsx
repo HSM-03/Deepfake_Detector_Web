@@ -19,7 +19,7 @@ import type { DoneResult } from '@/types/api';
 
 interface Props {
   /** 점수가 산출된 결과의 공통 필드 (SCR-03·07) */
-  result: Pick<DoneResult, 'p_model' | 'p_rppg' | 'thresholds'>;
+  result: Pick<DoneResult, 'p_model' | 'p_rppg' | 'thresholds'> & { p_rppg_provisional?: boolean };
   /** 종합 점수 S. 판단 보류 건은 null(표시하지 않음) */
   score: number | null;
   /** 두 막대 사이 차이를 화살표로 이어 상충 정도를 보여 준다 (SCR-07) */
@@ -33,6 +33,8 @@ interface Axis {
   term: string;
   value: number;
   zone: ScoreZone;
+  /** 위치 대신 보여 줄 짧은 설명 (예: P_rppg가 임시 값일 때) */
+  note?: string;
 }
 
 /** Y축 눈금: '이름 점수' + '용어 · 위치' 두 줄. 점수를 막대 끝에 두면 S 실선과 겹쳐서 여기에 적는다 */
@@ -43,7 +45,7 @@ function AxisTick({ x, y, axis }: { x: number; y: number; axis: Axis }) {
         {axis.name} {formatScore(axis.value)}
       </tspan>
       <tspan x={x} dy="1.45em" fontSize={12} fill="var(--color-text-muted)">
-        {axis.term} · {ZONE_STYLE[axis.zone].label}
+        {axis.term} · {axis.note ?? ZONE_STYLE[axis.zone].label}
       </tspan>
     </text>
   );
@@ -87,7 +89,13 @@ export function AxisScores({ result, score, gapArrow = false }: Props) {
 
   const axes: Axis[] = [
     { name: TERMS.pModel.label, term: TERMS.pModel.term, value: p_model, zone: scoreZone(p_model, t) },
-    { name: TERMS.pRppg.label, term: TERMS.pRppg.term, value: p_rppg, zone: scoreZone(p_rppg, t) },
+    {
+      name: TERMS.pRppg.label,
+      term: TERMS.pRppg.term,
+      value: p_rppg,
+      zone: scoreZone(p_rppg, t),
+      note: result.p_rppg_provisional ? '임시: 메인 모델 값' : undefined,
+    },
   ];
   const summary = axes.map((axis) => `${axis.name} ${f(axis.value)} ${ZONE_STYLE[axis.zone].label}`).join(', ');
 

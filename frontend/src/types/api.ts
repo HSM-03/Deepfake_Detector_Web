@@ -154,6 +154,11 @@ interface ScoredFields {
   p_model_std: number;
   /** rPPG 축 조작 확률 */
   p_rppg: number;
+  /**
+   * P_rppg가 분류기 없이 임시로 P_model 값을 쓴 결과인지(백엔드 5단계 전). true면 판단 보류가 나올 수 없고
+   * 종합 점수 S도 사실상 메인 모델 단독 값이다 — 화면에 "분류기 미적용"을 표시한다
+   */
+  p_rppg_provisional: boolean;
   /** 적용된 rPPG 가중치. S = (1 − w)·P_model + w·P_rppg */
   w: number;
   sqi: SqiInfo;
@@ -316,6 +321,12 @@ export interface EvidenceResponse {
   };
   /** SQI < sqi_min일 때 true → 'rPPG 미반영(신호 품질 낮음)' 배너 표시 */
   rppg_low_contribution: boolean;
+  /** 결과의 p_rppg_provisional과 같다 (근거 화면의 P_rppg 자리에 "분류기 미적용" 표시) */
+  p_rppg_provisional: boolean;
+  /** rPPG가 분석한 길이(초). 긴 영상은 앞 60초만 분석한다 */
+  rppg_analyzed_sec: number;
+  /** 영상이 더 길어 앞부분만 분석했으면 true → "앞 N초 분석" 표시 */
+  rppg_truncated: boolean;
 }
 
 /* ─────────── GET /api/jobs (SCR-05) ─────────── */

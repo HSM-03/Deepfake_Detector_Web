@@ -56,6 +56,7 @@ def init_db() -> None:
 _ADDED_COLUMNS = [
     ('jobs', 'face_frames_sampled', 'INTEGER'),
     ('jobs', 'face_frames_detected', 'INTEGER'),
+    ('results', 'p_rppg_provisional', 'BOOLEAN NOT NULL DEFAULT 0'),
 ]
 
 

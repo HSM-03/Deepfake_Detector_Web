@@ -74,9 +74,11 @@ class RoiTraces:
 
 
 def extract_traces(video_path, meta: VideoMeta | None = None, on_progress: Callable[[float], None] | None = None,
-                   frame_hook: Callable[[int, np.ndarray, dict], None] | None = None) -> RoiTraces:
+                   frame_hook: Callable[[int, np.ndarray, dict], None] | None = None,
+                   max_frames: int | None = None) -> RoiTraces:
     """
     영상의 모든 프레임에서 ROI 평균 RGB를 뽑는다 (rPPG는 프레임을 건너뛰면 안 된다).
+    max_frames: 앞에서부터 이 프레임 수까지만 (긴 영상은 앞부분만 분석)
     frame_hook(프레임 번호, BGR 프레임, ROI 다각형 dict): 확인용(ROI 그림 저장 등)
     """
     import mediapipe as mp  # 무거워서 쓸 때만 불러온다
@@ -85,7 +87,7 @@ def extract_traces(video_path, meta: VideoMeta | None = None, on_progress: Calla
     meta = meta or read_video_meta(path)
     if meta is None:
         raise ValueError(f'영상을 열 수 없습니다: {path}')
-    total = meta.frame_count
+    total = min(meta.frame_count, max_frames) if max_frames else meta.frame_count
 
     sums = {k: [] for k in ROI_KEYS + FACE_KEYS}
     counts = {k: [] for k in ROI_KEYS + FACE_KEYS}
@@ -97,7 +99,7 @@ def extract_traces(video_path, meta: VideoMeta | None = None, on_progress: Calla
                                            min_detection_confidence=0.5, min_tracking_confidence=0.5)
     try:
         index = 0
-        while True:
+        while max_frames is None or index < max_frames:
             ok, frame = cap.read()
             if not ok:
                 break

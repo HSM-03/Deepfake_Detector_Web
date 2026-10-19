@@ -106,6 +106,8 @@ class _ScoredFields(BaseModel):
     p_model: float
     p_model_std: float
     p_rppg: float
+    # P_rppg가 분류기 없이 임시로 P_model 값을 쓴 결과(5단계 전). true면 S도 사실상 메인 모델 단독 값
+    p_rppg_provisional: bool
     w: float
     sqi: SqiInfo
     roi_bpm: RoiBpm
@@ -224,6 +226,9 @@ class EvidenceResponse(BaseModel):
     features: list[FeatureRow]
     axis_summary: AxisSummary
     rppg_low_contribution: bool
+    p_rppg_provisional: bool
+    rppg_analyzed_sec: float  # rPPG가 분석한 길이(초). 긴 영상은 앞 RPPG_MAX_ANALYSIS_SEC초만
+    rppg_truncated: bool  # 영상이 그보다 길어 앞부분만 분석했으면 true
 
 
 # ── GET /api/jobs (SCR-05) ──

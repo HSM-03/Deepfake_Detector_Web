@@ -43,6 +43,11 @@ export function VerdictCard({ result }: Props) {
             <span aria-hidden="true">△ </span>rPPG 미반영(신호 품질 낮음) — 메인 모델 중심 판정
           </p>
         )}
+        {result.p_rppg_provisional && (
+          <p className="verdict-hero__flag verdict-hero__flag--info">
+            <span aria-hidden="true">ⓘ </span>P_rppg 분류기 미적용(5단계 예정) — 임시로 메인 모델 값 사용. 종합 점수 S도 사실상 메인 모델 단독 값입니다.
+          </p>
+        )}
       </div>
 
       <div className="verdict-hero__score">

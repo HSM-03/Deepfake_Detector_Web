@@ -138,6 +138,7 @@ def job_result(job: Job) -> s.DoneResult | s.HoldResult | s.FailedResult | None:
         p_model=r.p_model,
         p_model_std=r.p_model_std,
         p_rppg=r.p_rppg,
+        p_rppg_provisional=bool(r.p_rppg_provisional),
         w=r.w,
         sqi=s.SqiInfo(value=r.sqi, grade=r.sqi_grade, components=r.sqi_components),
         roi_bpm=r.roi_bpm,

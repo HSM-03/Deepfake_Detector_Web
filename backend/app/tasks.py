@@ -206,6 +206,7 @@ def _analyze(db, job: Job, tracker: Tracker) -> str:
         w=outcome.w,
         axis_gap=outcome.axis_gap,
         rppg_low_contribution=outcome.rppg_low_contribution,
+        p_rppg_provisional=result['provisional'],
         sqi=result['sqi'],
         sqi_grade=outcome.sqi_grade,
         sqi_components=result['sqi_components'],
@@ -231,14 +232,20 @@ def _real_rppg_stage(job: Job, tracker: Tracker, main: dummy.MainModelValues) ->
     meta = VideoMeta(width=job.width, height=job.height, fps=job.fps, duration_sec=job.duration_sec,
                      frame_count=job.frame_count, codec=job.codec)
     tracker.set('rppg', 0)
-    traces = rppg_signal.extract_traces(path, meta, on_progress=lambda r: tracker.set('rppg', min(95, int(r * 95))))
+    # 긴 영상은 앞 RPPG_MAX_ANALYSIS_SEC초만 (처리 시간이 길이에 비례). 메인 모델은 영상 전체에서 32프레임 그대로
+    max_frames = int(round(analysis_settings.RPPG_MAX_ANALYSIS_SEC * meta.fps)) if meta.fps else None
+    truncated = bool(max_frames and meta.frame_count > max_frames)
+    analyzed_sec = min(meta.duration_sec or 0.0, analysis_settings.RPPG_MAX_ANALYSIS_SEC)
+    traces = rppg_signal.extract_traces(path, meta, on_progress=lambda r: tracker.set('rppg', min(95, int(r * 95))),
+                                        max_frames=max_frames)
     features = rppg_features.compute(traces)
     quality = sqi.compute(traces, meta.codec, stream_info(path, meta))
     tracker.set('rppg', 100)
     hr = features.hr_bpm
     weakest = interpret.SQI_COMPONENT_LABELS[quality.weakest]
     tracker.log('rppg', f'rPPG 분석 완료 — 심박 {"측정 실패" if hr is None else f"{hr:.0f}BPM"}, SQI {quality.value:.2f}'
-                        f' (가장 약한 항목: {weakest}), 얼굴 추적 {traces.tracked_rate:.0%}')
+                        f' (가장 약한 항목: {weakest}), 얼굴 추적 {traces.tracked_rate:.0%}'
+                        + (f', 영상 {meta.duration_sec:.0f}초 중 앞 {analyzed_sec:.0f}초 분석' if truncated else ''))
     if not analysis_settings.USE_DUMMY_P_RPPG:  # 5단계에서 분류기 점수로 바꾼다
         raise AnalysisStopped(_unknown_failure('rppg', 'P_rppg 분류기가 아직 연결되지 않았습니다 (USE_DUMMY_P_RPPG=false, 5단계)'))
     p_rppg = main.p_model
@@ -246,10 +253,12 @@ def _real_rppg_stage(job: Job, tracker: Tracker, main: dummy.MainModelValues) ->
     profile = main.profile or []
 
     def evidence(roi: str, outcome: fusion.FusionOutcome, axis_summary: dict) -> dict:
-        return rppg_evidence.build(job.id, roi, traces, features, profile, axis_summary, outcome.rppg_low_contribution)
+        return rppg_evidence.build(job.id, roi, traces, features, profile, axis_summary, outcome.rppg_low_contribution,
+                                   analyzed_sec, truncated, provisional=True)
 
     return {'p_rppg': p_rppg, 'sqi': quality.value, 'sqi_components': quality.components, 'roi_bpm': roi_bpm,
-            'mirrors': True, 'measured': {'hr': hr, 'weakest': quality.weakest}, 'evidence': evidence}
+            'mirrors': True, 'measured': {'hr': hr, 'weakest': quality.weakest, 'truncated_sec': analyzed_sec if truncated else None},
+            'evidence': evidence, 'provisional': True}
 
 
 def _dummy_rppg_stage(job: Job, tracker: Tracker, main: dummy.MainModelValues, dummy_main: bool) -> dict:
@@ -269,11 +278,12 @@ def _dummy_rppg_stage(job: Job, tracker: Tracker, main: dummy.MainModelValues, d
         data = dummy.build_evidence(job.id, roi, job.fps or 30, job.duration_sec or 20, main, values,
                                     outcome.w, '', outcome.rppg_low_contribution, axis_text_prefix='')
         data['axis_summary'] = axis_summary
+        data.update(p_rppg_provisional=False, rppg_analyzed_sec=float(job.duration_sec or 0.0), rppg_truncated=False)
         return data
 
     return {'p_rppg': values.p_rppg, 'sqi': values.sqi, 'sqi_components': values.sqi_components,
             'roi_bpm': values.roi_bpm, 'mirrors': dummy.rppg_follows_model(job.filename), 'measured': None,
-            'evidence': evidence}
+            'evidence': evidence, 'provisional': False}
 
 
 def _dummy_main_model(job: Job, tracker: Tracker, scenario_key: str) -> dummy.MainModelValues:

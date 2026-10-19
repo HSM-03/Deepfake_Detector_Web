@@ -71,7 +71,7 @@ def _display(key: str, value: float) -> str:
 
 
 def build(job_id: str, roi: str, traces: rppg.RoiTraces, features: RppgFeatures, model_profile: list[dict],
-          axis_summary: dict, low_contribution: bool) -> dict:
+          axis_summary: dict, low_contribution: bool, analyzed_sec: float, truncated: bool, provisional: bool) -> dict:
     """ROI 하나의 근거 응답. roi는 API 선택지('all', 'forehead', 'left_cheek', 'right_cheek')"""
     key = settings.RPPG_PRIMARY_ROI if roi == 'all' else roi
     est = features.estimates[key]
@@ -111,4 +111,7 @@ def build(job_id: str, roi: str, traces: rppg.RoiTraces, features: RppgFeatures,
         'features': feature_rows(features),
         'axis_summary': axis_summary,
         'rppg_low_contribution': low_contribution,
+        'p_rppg_provisional': provisional,
+        'rppg_analyzed_sec': round(float(analyzed_sec), 2),
+        'rppg_truncated': truncated,
     }
