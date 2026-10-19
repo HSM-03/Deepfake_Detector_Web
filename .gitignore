@@ -40,3 +40,6 @@ backend/out/
 *.dat
 *.npy
 *.npz
+
+# 개인 문서 (보고서 — 이름·학번이 있어 public 저장소에 올리지 않는다)
+Claude outputs/
