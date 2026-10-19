@@ -4,7 +4,8 @@
   1. 업로드·검증: 영상 정보를 실제로 읽는다. 열 수 없으면 '파일 손상', 10초 미만이면 '길이 부족'으로 분석 불가
   2. 전처리·ROI 추적  ┐ 메인 모델: 실제 EfficientNet-B4(analysis/main_model.py). 얼굴 검출률이 기준 미만이면 '얼굴 미검출'
   3. 메인 모델 판별   ┘ USE_DUMMY_MAIN_MODEL을 켜면 모델 없이 더미 값으로 흉내 낸다
-  4. rPPG 신호 분석     USE_DUMMY_RPPG가 켜져 있으면 더미(키워드가 없으면 P_rppg = P_model), 아니면 실제(4단계)
+  4. rPPG 신호 분석     실제(4단계): 얼굴 ROI 추적 → 특징 6개 → SQI. P_rppg는 5단계 분류기 전까지 P_model 값(USE_DUMMY_P_RPPG)
+                       USE_DUMMY_RPPG를 켜면 예전 더미 시나리오(파일 이름 키워드)로 동작한다
   5. 융합 판정          판정 규칙은 어느 경우든 실제 규칙(fusion.py)을 적용한다
 
 단계 사이마다 취소됐는지 확인한다(progress.Tracker가 JobCanceled를 낸다).
@@ -15,7 +16,9 @@ import time
 import traceback
 from pathlib import Path
 
-from analysis import dummy, fusion, interpret
+from analysis import dummy, fusion, interpret, rppg_evidence, rppg_features, sqi
+from analysis import rppg as rppg_signal
+from analysis.stream_info import stream_info
 from analysis import settings as analysis_settings
 from analysis.video_meta import VideoMeta, read_video_meta
 
@@ -165,66 +168,112 @@ def _analyze(db, job: Job, tracker: Tracker) -> str:
     dummy_main = analysis_settings.USE_DUMMY_MAIN_MODEL
     dummy_rppg = analysis_settings.USE_DUMMY_RPPG
     scenario_key = dummy.scenario_from_filename(job.filename)
-    if not dummy_rppg:
-        # 실제 rPPG는 4단계에서 연결한다. 메인 모델(약 20초)을 돌리기 전에 멈춘다
-        raise AnalysisStopped(_unknown_failure('rppg', 'rPPG 분석이 아직 연결되지 않았습니다 (USE_DUMMY_RPPG=false)'))
 
-    # ── 2. 전처리·ROI 추적 / 3. 메인 모델 (∥ 4. rPPG) ──
+    # ── 2. 전처리·ROI 추적 / 3. 메인 모델 ──
     if dummy_main:
         main = _dummy_main_model(job, tracker, scenario_key)
     else:
         main = _real_main_model(db, job, tracker)
 
-    # ── 4. rPPG (4단계 전까지 더미. 키워드가 없으면 P_rppg = P_model이라 판정이 메인 모델 단독과 같다) ──
-    rppg = dummy.dummy_rppg(job.filename, main.p_model)
-    if dummy_main:  # 메인 모델 ∥ rPPG는 병렬 단계라 두 진행률을 함께 올린다
-        _advance(tracker, ['model', 'rppg'], max(seconds['model'], seconds['rppg']),
-                 ratios={'model': seconds['rppg'] / seconds['model'], 'rppg': 1.0})
-        tracker.log('model', f'{p}메인 모델 판별 완료 — P_model = {main.p_model:.2f}')
-    else:  # 실제 메인 모델이 도는 동안 rPPG 진행률은 따라 올라가 있다(90%까지). 짧게 마저 채운다
-        time.sleep(seconds['rppg_after_main'])
-        tracker.set('rppg', 100)
-    tracker.log('rppg', f'{p}rPPG 분석 완료 — P_rppg = {rppg.p_rppg:.2f}')
+    # ── 4. rPPG ──
+    if dummy_rppg:
+        result = _dummy_rppg_stage(job, tracker, main, dummy_main)
+    else:
+        result = _real_rppg_stage(job, tracker, main)
 
-    # ── 5. 융합 판정 (규칙은 실제. SQI가 rPPG에서 나오므로 rPPG가 더미면 [더미]) ──
+    # ── 5. 융합 판정 (규칙은 실제) ──
     _advance(tracker, ['fusion'], seconds['fusion'])
-    outcome = fusion.fuse(main.p_model, rppg.p_rppg, rppg.sqi)
-    tracker.log('fusion', f'{p if dummy_rppg else ""}융합 판정 완료 — SQI = {rppg.sqi:.2f}, w = {outcome.w:.2f}')
+    outcome = fusion.fuse(main.p_model, result['p_rppg'], result['sqi'])
+    tracker.log('fusion', f'{p if dummy_rppg else ""}융합 판정 완료 — SQI = {result["sqi"]:.2f}, w = {outcome.w:.2f}'
+                + (' (rPPG 미반영: 신호 품질 낮음)' if outcome.rppg_low_contribution else ''))
 
-    mirrors = dummy_rppg and dummy.rppg_follows_model(job.filename)  # 더미 P_rppg = P_model (키워드 없음)
-    # 해석 문장: 실제 점수·판정으로 만든다. 더미인 축은 해당 부분에 [더미] (메인 모델이 더미면 문장 전체)
     interpretation = interpret.interpretation(
-        outcome, main.p_model, rppg.p_rppg, rppg.sqi,
+        outcome, main.p_model, result['p_rppg'], result['sqi'],
         face_count=None if dummy_main else job.face_frames_detected,
         profile=main.profile,
         rppg_is_dummy=dummy_rppg and not dummy_main,
-        rppg_mirrors_model=mirrors,
+        rppg_mirrors_model=result['mirrors'],
+        rppg_measured=result['measured'],
     )
-    any_dummy = dummy_main or dummy_rppg
+    axis_text = interpret.axis_summary(outcome, main.p_model, result['p_rppg'], result['sqi'],
+                                       rppg_mirrors_model=result['mirrors'], rppg_measured=result['measured'])
     job.result = Result(
         verdict=outcome.verdict,
         score=outcome.score,
         p_model=round(main.p_model, 3),
         p_model_std=round(main.p_model_std, 3),
-        p_rppg=round(rppg.p_rppg, 3),
+        p_rppg=round(result['p_rppg'], 3),
         w=outcome.w,
         axis_gap=outcome.axis_gap,
         rppg_low_contribution=outcome.rppg_low_contribution,
-        sqi=rppg.sqi,
+        sqi=result['sqi'],
         sqi_grade=outcome.sqi_grade,
-        sqi_components=rppg.sqi_components,
-        roi_bpm=rppg.roi_bpm,
+        sqi_components=result['sqi_components'],
+        roi_bpm=result['roi_bpm'],
         thresholds=fusion.thresholds(),
         interpretation=(p if dummy_main else '') + interpretation,
     )
-    axis_text = interpret.axis_summary(outcome, main.p_model, rppg.p_rppg, rppg.sqi, rppg_mirrors_model=mirrors)
+    axis_summary = {'p_model': round(main.p_model, 3), 'p_rppg': round(result['p_rppg'], 3), 'w': outcome.w,
+                    'sqi': result['sqi'], 'text': (p if (dummy_main or dummy_rppg) else '') + axis_text}
     for roi in ROI_SELECTORS:
-        data = dummy.build_evidence(job.id, roi, job.fps or 30, job.duration_sec or 20, main, rppg,
-                                    outcome.w, axis_text, outcome.rppg_low_contribution,
-                                    axis_text_prefix=p if any_dummy else '')
-        job.evidence.append(Evidence(roi=roi, data=data))
+        job.evidence.append(Evidence(roi=roi, data=result['evidence'](roi, outcome, axis_summary)))
     db.commit()
     return 'hold' if outcome.verdict == 'hold' else 'done'
+
+
+def _real_rppg_stage(job: Job, tracker: Tracker, main: dummy.MainModelValues) -> dict:
+    """
+    실제 rPPG: 영상 전체 프레임의 얼굴 ROI 추적 → 특징 6개(rppg_features, FF++ 검증과 같은 함수) → SQI.
+    P_rppg는 5단계 분류기를 붙이기 전까지 P_model 값을 쓴다(USE_DUMMY_P_RPPG) — 판정은 바뀌지 않고, 신호·근거는 실제다.
+    추적 중에는 진행률을 쓸 때마다 취소를 확인하므로 취소하면 바로 멈춘다.
+    """
+    path = Path(job.stored_path)
+    meta = VideoMeta(width=job.width, height=job.height, fps=job.fps, duration_sec=job.duration_sec,
+                     frame_count=job.frame_count, codec=job.codec)
+    tracker.set('rppg', 0)
+    traces = rppg_signal.extract_traces(path, meta, on_progress=lambda r: tracker.set('rppg', min(95, int(r * 95))))
+    features = rppg_features.compute(traces)
+    quality = sqi.compute(traces, meta.codec, stream_info(path, meta))
+    tracker.set('rppg', 100)
+    hr = features.hr_bpm
+    weakest = interpret.SQI_COMPONENT_LABELS[quality.weakest]
+    tracker.log('rppg', f'rPPG 분석 완료 — 심박 {"측정 실패" if hr is None else f"{hr:.0f}BPM"}, SQI {quality.value:.2f}'
+                        f' (가장 약한 항목: {weakest}), 얼굴 추적 {traces.tracked_rate:.0%}')
+    if not analysis_settings.USE_DUMMY_P_RPPG:  # 5단계에서 분류기 점수로 바꾼다
+        raise AnalysisStopped(_unknown_failure('rppg', 'P_rppg 분류기가 아직 연결되지 않았습니다 (USE_DUMMY_P_RPPG=false, 5단계)'))
+    p_rppg = main.p_model
+    roi_bpm = {k: None if b is None else round(float(b), 1) for k, b in features.roi_bpm.items()}
+    profile = main.profile or []
+
+    def evidence(roi: str, outcome: fusion.FusionOutcome, axis_summary: dict) -> dict:
+        return rppg_evidence.build(job.id, roi, traces, features, profile, axis_summary, outcome.rppg_low_contribution)
+
+    return {'p_rppg': p_rppg, 'sqi': quality.value, 'sqi_components': quality.components, 'roi_bpm': roi_bpm,
+            'mirrors': True, 'measured': {'hr': hr, 'weakest': quality.weakest}, 'evidence': evidence}
+
+
+def _dummy_rppg_stage(job: Job, tracker: Tracker, main: dummy.MainModelValues, dummy_main: bool) -> dict:
+    """USE_DUMMY_RPPG를 켰을 때: 예전 더미 시나리오(키워드가 없으면 P_rppg = P_model). 판단 보류 등 화면 확인용"""
+    p = dummy.DUMMY_PREFIX
+    seconds = analysis_settings.DUMMY_STAGE_SECONDS
+    values = dummy.dummy_rppg(job.filename, main.p_model)
+    if dummy_main:  # 메인 모델 ∥ rPPG는 병렬 단계라 두 진행률을 함께 올린다
+        _advance(tracker, ['model', 'rppg'], max(seconds['model'], seconds['rppg']),
+                 ratios={'model': seconds['rppg'] / seconds['model'], 'rppg': 1.0})
+        tracker.log('model', f'{p}메인 모델 판별 완료 — P_model = {main.p_model:.2f}')
+    else:
+        _advance(tracker, ['rppg'], seconds['rppg_after_main'])
+    tracker.log('rppg', f'{p}rPPG 분석 완료 — P_rppg = {values.p_rppg:.2f}')
+
+    def evidence(roi: str, outcome: fusion.FusionOutcome, axis_summary: dict) -> dict:
+        data = dummy.build_evidence(job.id, roi, job.fps or 30, job.duration_sec or 20, main, values,
+                                    outcome.w, '', outcome.rppg_low_contribution, axis_text_prefix='')
+        data['axis_summary'] = axis_summary
+        return data
+
+    return {'p_rppg': values.p_rppg, 'sqi': values.sqi, 'sqi_components': values.sqi_components,
+            'roi_bpm': values.roi_bpm, 'mirrors': dummy.rppg_follows_model(job.filename), 'measured': None,
+            'evidence': evidence}
 
 
 def _dummy_main_model(job: Job, tracker: Tracker, scenario_key: str) -> dummy.MainModelValues:
@@ -269,7 +318,6 @@ def _real_main_model(db, job: Job, tracker: Tracker) -> dummy.MainModelValues:
 
     def model_progress(stage: str, percent: int) -> None:
         tracker.set('model', percent)
-        tracker.set('rppg', min(percent, 90))  # rPPG는 아직 더미: 메인 모델과 나란히 진행되는 것처럼 보인다
 
     import torch
 

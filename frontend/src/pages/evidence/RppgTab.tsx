@@ -53,7 +53,7 @@ function SignalChart({ data, label }: { data: SignalPoint[]; label: string }) {
   );
 }
 
-/** SCR-04 ④ rPPG 차트 3종 + ⑤ 일관성 차트(ROI별 BPM, 3초 윈도우 BPM 변동) */
+/** SCR-04 ④ rPPG 차트 3종 + ⑤ 일관성 차트(ROI별 BPM, 8초 윈도우 BPM 변동) */
 export function RppgTab({ evidence, loading }: Props) {
   const { peak, hr_band: band, window_bpm } = evidence;
   const windowValues = window_bpm.flatMap((w) => (w.bpm === null ? [] : [w.bpm]));
@@ -135,8 +135,8 @@ export function RppgTab({ evidence, loading }: Props) {
       <div className="evidence-grid__wide">
         <ChartCard
           title="시간에 따른 심박수 변화"
-          term="3초 윈도우 BPM"
-          hint="영상을 3초씩 잘라 구간마다 심박수를 다시 잰 값입니다. 실제 얼굴이면 구간마다 크게 흔들리지 않습니다."
+          term="8초 윈도우 BPM"
+          hint="영상을 8초씩(1초 간격으로 옮기며) 잘라 구간마다 심박수를 다시 잰 값입니다. 실제 얼굴이면 구간마다 크게 흔들리지 않습니다."
           loading={loading}
           height={CHART_HEIGHT}
           caption={
@@ -148,7 +148,7 @@ export function RppgTab({ evidence, loading }: Props) {
           {windowValues.length === 0 ? (
             <p className="muted">이 부위에서는 심박을 추정하지 못해 구간별 값이 없습니다.</p>
           ) : (
-            <div role="img" aria-label="3초 윈도우별 추정 BPM">
+            <div role="img" aria-label="8초 윈도우별 추정 BPM">
               <ResponsiveContainer width="100%" height={CHART_HEIGHT}>
                 <LineChart data={window_bpm} margin={{ top: 8, right: 16, bottom: 0, left: 0 }}>
                   <CartesianGrid stroke={GRID_STROKE} vertical={false} />

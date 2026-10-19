@@ -19,7 +19,9 @@ export function RoiBpmCard({ roiBpm, std }: Props) {
     bpm: roiBpm[key],
   }));
   const estimated = data.flatMap((d) => (d.bpm === null ? [] : [d.bpm]));
-  const spread = estimated.length >= 2 ? Math.max(...estimated) - Math.min(...estimated) : null;
+  // 실제 백엔드의 심박은 소수 첫째 자리까지라, 빼면 25.199999… 같은 부동소수점 오차가 생긴다 → 소수 첫째 자리로 맞춘다
+  const spread =
+    estimated.length >= 2 ? Math.round((Math.max(...estimated) - Math.min(...estimated)) * 10) / 10 : null;
   const summary = ROI_KEYS.map((key) => `${ROI_LABEL[key]} ${roiBpm[key] ?? '추정 실패'}`).join(', ');
 
   return (

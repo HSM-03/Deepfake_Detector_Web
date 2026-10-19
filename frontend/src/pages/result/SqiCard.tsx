@@ -22,10 +22,14 @@ const COMPONENTS: Array<{ key: keyof SqiInfo['components']; label: string; hint:
   { key: 'motion', label: '움직임', hint: '머리·얼굴 움직임이 적을수록 높음' },
 ];
 
-/** SCR-03 ③ SQI 카드 — 신호품질지수와 등급, 구성 요소 4개. SQI가 하한 미만이면 경고 */
+/**
+ * SCR-03 ③ SQI 카드 — 신호품질지수와 등급, 구성 요소 4개. SQI가 하한 미만이면 "rPPG 미반영" 경고.
+ * SQI는 네 항목 중 가장 낮은 값이라(백엔드 analysis/sqi.py), 가장 낮은 항목을 "병목"으로 표시한다(색만이 아니라 글자로)
+ */
 export function SqiCard({ sqi, thresholds, w, low }: Props) {
   const f = formatScore;
   const percent = (n: number) => `${n * 100}%`;
+  const weakest = COMPONENTS.reduce((min, c) => (sqi.components[c.key] < sqi.components[min.key] ? c : min));
 
   return (
     <section className="card stack">
@@ -57,17 +61,24 @@ export function SqiCard({ sqi, thresholds, w, low }: Props) {
 
       {low && (
         <p className="warn-box">
-          <span aria-hidden="true">△ </span>SQI가 하한({f(thresholds.sqi_min)}) 미만 — rPPG 축 가중치가 w = {f(w)}로
-          줄었습니다.
+          <strong>
+            <span aria-hidden="true">△ </span>rPPG 미반영(신호 품질 낮음)
+          </strong>{' '}
+          — SQI가 하한({f(thresholds.sqi_min)}) 미만이라 rPPG 축 가중치를 줄였습니다(w = {f(w)}). 가장 약한 항목:{' '}
+          {weakest.label}.
         </p>
       )}
 
       <ul className="sqi__components">
         {COMPONENTS.map(({ key, label, hint }) => {
           const value = sqi.components[key];
+          const isWeakest = key === weakest.key;
           return (
-            <li key={key} title={hint}>
-              <span>{label}</span>
+            <li key={key} title={hint} className={isWeakest ? 'sqi__component--weakest' : undefined}>
+              <span>
+                {label}
+                {isWeakest && <span className="sqi__weakest-tag">병목</span>}
+              </span>
               <div
                 className="meter"
                 role="meter"
@@ -83,7 +94,10 @@ export function SqiCard({ sqi, thresholds, w, low }: Props) {
           );
         })}
       </ul>
-      <p className="caption">구성 요소는 0~1이며 1에 가까울수록 신호를 뽑기 좋은 조건입니다.</p>
+      <p className="caption">
+        구성 요소는 0~1이며 1에 가까울수록 신호를 뽑기 좋은 조건입니다. SQI는 네 항목 중 가장 낮은 값입니다(지금 SQI를 정한
+        항목: <strong>{weakest.label}</strong>).
+      </p>
     </section>
   );
 }

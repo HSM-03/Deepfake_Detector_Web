@@ -112,8 +112,11 @@ function EvidenceView({ result }: { result: DoneResult | HoldResult }) {
 
       {evidence?.rppg_low_contribution && (
         <p className="warn-box">
-          <span aria-hidden="true">△ </span>rPPG 축 기여도가 0에 근접합니다(w = {evidence.axis_summary.w.toFixed(2)}).
-          본 판정은 사실상 메인 모델 단독 결과입니다.
+          <strong>
+            <span aria-hidden="true">△ </span>rPPG 미반영(신호 품질 낮음)
+          </strong>{' '}
+          — SQI가 하한보다 낮아 rPPG 축 가중치를 줄였습니다(w = {evidence.axis_summary.w.toFixed(2)}). 본 판정은 사실상 메인
+          모델 단독 결과입니다. 원인은 SQI 탭에서 볼 수 있습니다.
         </p>
       )}
 

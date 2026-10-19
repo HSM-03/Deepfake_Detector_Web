@@ -67,10 +67,10 @@ export function buildEvidence(record: JobRecord, t: ScoredTemplate, roi: RoiSele
   const top = inBand.reduce((a, b) => (b.power > a.power ? b : a));
   const peak = bpm === null ? null : { hz: top.hz, bpm: Math.round(top.hz * 60), power: top.power };
 
-  /* 3초 슬라이딩 윈도우 BPM (1초 간격) */
+  /* 8초 슬라이딩 윈도우 BPM (1초 간격) */
   const spread = t.periodicity >= 0.5 ? 1.5 : 22;
   const window_bpm: WindowBpm[] = [];
-  for (let start = 0; start + 3 <= duration; start++) {
+  for (let start = 0; start + 8 <= duration; start++) {
     window_bpm.push({ t_start: start, bpm: bpm === null ? null : Math.round(bpm + spread * noise()) });
   }
 

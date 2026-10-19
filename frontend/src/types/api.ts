@@ -169,7 +169,7 @@ export interface DoneResult extends ResultBase, ScoredFields {
   verdict: 'real' | 'fake';
   /** 종합 점수 S */
   score: number;
-  /** SQI < sqi_min → 'rPPG 기여도 낮음 — 메인 모델 중심 판정' 표기 */
+  /** SQI < sqi_min → 'rPPG 미반영(신호 품질 낮음) — 메인 모델 중심 판정' 표기 */
   rppg_low_contribution: boolean;
 }
 
@@ -247,7 +247,7 @@ export interface PsdPoint {
 }
 
 export interface WindowBpm {
-  /** 3초 슬라이딩 윈도우 시작 시각(초) */
+  /** 8초 슬라이딩 윈도우(1초 간격) 시작 시각(초). 화면설계서는 3초였으나 해상도 문제로 바꿈(docs/backend-plan.md 4단계) */
   t_start: number;
   bpm: number | null;
 }
@@ -314,7 +314,7 @@ export interface EvidenceResponse {
     sqi: number;
     text: string;
   };
-  /** w≈0일 때 true → 'rPPG 축 기여도 0에 근접' 배너 표시 */
+  /** SQI < sqi_min일 때 true → 'rPPG 미반영(신호 품질 낮음)' 배너 표시 */
   rppg_low_contribution: boolean;
 }
 

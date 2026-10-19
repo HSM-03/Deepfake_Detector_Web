@@ -33,7 +33,7 @@ S = (1 − w)·P_model + w·P_rppg,   w = α·SQI
 | 1 | 메인 모델 단독 추론 스크립트 | 완료 |
 | 2 | 백엔드 골격 (FastAPI·Celery·Redis·SQLite, API 7개) | 완료 |
 | 3 | 실제 메인 모델을 웹 분석에 연결 | 완료 |
-| 4 | rPPG 파이프라인 (ROI 추적, CHROM/POS, 대역통과, Welch, 특징 6개, SQI) | 진행 중 — 신호 처리·소규모 검증 완료, 웹 연결 전 |
+| 4 | rPPG 파이프라인 (ROI 추적, CHROM/POS, 대역통과, Welch, 특징 6개, SQI) | 진행 중 — 웹 연결 완료, 최종 확인 남음 (P_rppg는 5단계까지 임시) |
 | 5 | rPPG 분류기 학습, 융합 가중치·임계값 결정, 평가 세트 비교 | 예정 |
 
 단계별 상세 기록은 [`docs/backend-plan.md`](docs/backend-plan.md)에 있습니다.

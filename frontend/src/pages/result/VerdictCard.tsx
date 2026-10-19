@@ -40,7 +40,7 @@ export function VerdictCard({ result }: Props) {
         <p className="verdict-hero__text">{result.interpretation}</p>
         {result.result_type === 'done' && result.rppg_low_contribution && (
           <p className="verdict-hero__flag">
-            <span aria-hidden="true">△ </span>rPPG 기여도 낮음 — 메인 모델 중심 판정
+            <span aria-hidden="true">△ </span>rPPG 미반영(신호 품질 낮음) — 메인 모델 중심 판정
           </p>
         )}
       </div>

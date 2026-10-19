@@ -24,9 +24,11 @@ def _env_flag(name: str, default: bool) -> bool:
 # 메인 모델 점수(P_model, 구간 프로파일). 3단계에서 실제 EfficientNet-B4를 붙여 기본으로 끈다.
 # 켜면(USE_DUMMY_MAIN_MODEL=true) 모델 없이 화면만 확인할 수 있다(파일 이름 키워드 fail·noface도 이때만 동작)
 USE_DUMMY_MAIN_MODEL = _env_flag('USE_DUMMY_MAIN_MODEL', False)
-# rPPG 점수·SQI·ROI 심박·근거 차트. rPPG 파이프라인을 붙이는 4단계까지 켜 둔다.
-# 파일 이름에 키워드(hold, lowsqi, fake)가 없으면 P_rppg = P_model로 두어 판정을 바꾸지 않는다(dummy.dummy_rppg)
-USE_DUMMY_RPPG = _env_flag('USE_DUMMY_RPPG', True)
+# rPPG 신호 분석(SQI·ROI 심박·특징·근거 차트). 4단계에서 실제 계산을 붙여 기본으로 끈다.
+# 켜면(USE_DUMMY_RPPG=true) 예전처럼 더미 시나리오로 동작한다 — 파일 이름 키워드(hold, lowsqi, fake)로 판단 보류 등 화면을 확인할 때 쓴다
+USE_DUMMY_RPPG = _env_flag('USE_DUMMY_RPPG', False)
+# P_rppg(rPPG 축의 진짜/가짜 점수)는 5단계 분류기 전까지 P_model 값을 그대로 쓴다(판정을 바꾸지 않음). 신호 분석은 실제다
+USE_DUMMY_P_RPPG = _env_flag('USE_DUMMY_P_RPPG', True)
 # 더미 모드에서 단계마다 걸리는 시간(초). 진행 화면을 확인할 수 있을 만큼만 기다린다 (합계 약 12초)
 # rppg_after_main: 메인 모델이 실제일 때, 메인 모델이 끝난 뒤 더미 rPPG를 채우는 시간
 DUMMY_STAGE_SECONDS = {'preprocess': 4.0, 'model': 5.0, 'rppg': 6.0, 'fusion': 2.0, 'rppg_after_main': 2.0}
@@ -139,3 +141,16 @@ SQI_BACKGROUND_INBAND = (0.015, 0.004)
 # 움직임: 프레임당 얼굴 중심 이동(얼굴 폭 대비), 프레임당 입 벌림 변화(얼굴 높이 대비) (0점, 1점). 둘 중 낮은 쪽
 SQI_HEAD_MOTION = (0.03, 0.005)
 SQI_MOUTH_MOTION = (0.008, 0.001)  # 영상 3편(웹캠 09·11·13번, 말하기) 기준 예시값
+
+# ── rPPG 특징 표의 기준값(화면의 "실제 얼굴 기준 (예시)"와 ○△× 판단) — 4-3 ──
+# 신호가 좋았던 영상 10편(UBFC 원본 3, 휴대폰·웹캠 원본 7)의 분포로 잡은 예시값. 5단계에서 학습 데이터 분포로 다시 정한다.
+# (방향, ○ 경계, △ 경계): 'min'이면 값이 클수록 좋음(○ ≥ 첫 값, △ ≥ 둘째 값), 'max'면 작을수록 좋음
+RPPG_FEATURE_JUDGE = {
+    'snr': ('min', -1.5, -3.5),  # 좋은 영상 중앙값 −1.2dB, Celeb-real −4.2
+    'spectral_entropy': ('max', 0.88, 0.91),  # 좋은 영상 75% 0.88, Celeb-real 중앙 0.90
+    'roi_bpm_std': ('max', 3.0, 8.0),  # 좋은 영상 중앙 0.9BPM, Celeb-real 21.3
+    'phase_consistency': ('min', 0.40, 0.20),  # 좋은 영상 중앙 0.43, Celeb-real 0.14
+    'window_bpm_var': ('max', 8.0, 12.0),  # 좋은 영상 75% 8.7BPM, Celeb-real 중앙 12.2
+}
+# 근거 화면 파형 차트에 보낼 최대 길이(초). 길면 응답이 커진다
+RPPG_EVIDENCE_MAX_SEC = 60.0

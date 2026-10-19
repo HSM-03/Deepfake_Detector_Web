@@ -18,7 +18,7 @@ backend/
 docker-compose.yml    Redis + API 서버 + 워커
 ```
 
-진행 상황은 `docs/backend-plan.md`의 각 단계 아래 "결과"에 기록한다. 지금은 3단계(메인 모델 연결)까지 끝났다. rPPG는 아직 더미다.
+진행 상황은 `docs/backend-plan.md`의 각 단계 아래 "결과"에 기록한다. 지금은 4단계(rPPG) 진행 중이다 — rPPG 신호 분석은 웹에 연결됐고, P_rppg(분류기)는 5단계까지 임시 값이다.
 
 - **API 형식의 기준은 `frontend/src/types/api.ts`다.** 백엔드 응답은 이 타입과 정확히 맞아야 한다.
   형식을 바꿔야 하면 바꾸기 전에 사용자에게 알리고, 타입 → 목(`frontend/src/mocks/`) → 백엔드를 함께 고친다.
@@ -63,9 +63,12 @@ Celeb-DF의 `List_of_testing_videos.txt` 518개는 최종 평가 전용이다. U
   | `docker compose run --rm api python -m app.db` | DB 파일 위치, WAL 모드, 테이블 목록 확인 |
 
   - API 문서(자동 생성): http://localhost:8000/docs, 상태 확인: http://localhost:8000/api/health
-  - **메인 모델은 실제**(3단계). 워커가 처음 작업을 받을 때 모델을 한 번 불러 둔다. 영상 1편 약 25~30초.
-  - **rPPG는 더미**(`USE_DUMMY_RPPG`, 기본 켜짐, 4단계에서 끈다): 파일명에 키워드(`fake` / `hold` / `lowsqi`)가 없으면
-    P_rppg = P_model로 두어 판정이 메인 모델 단독 결과와 같다. 키워드가 있으면 더미 시나리오 값(판단 보류·신호 품질 낮음 화면 확인용).
+  - **메인 모델은 실제**(3단계). 워커가 처음 작업을 받을 때 모델을 한 번 불러 둔다.
+  - **rPPG 신호 분석도 실제**(4단계): 얼굴 ROI 추적 → 심박·특징 6개·SQI, 근거 화면의 파형·스펙트럼도 실제 값이다.
+    영상 1편 약 30~60초(메인 모델 약 25~35초 + rPPG 3~17초, 해상도·길이에 따라).
+  - **P_rppg만 임시 값**(`USE_DUMMY_P_RPPG`, 기본 켜짐): 5단계 분류기 전까지 P_model과 같은 값이라 판정은 메인 모델 단독 결과와 같다.
+    SQI가 하한(0.5) 미만이면 화면에 "rPPG 미반영(신호 품질 낮음)"이 나온다.
+  - `USE_DUMMY_RPPG=true`로 켜면 예전 더미 시나리오로 동작한다: 파일명 키워드(`fake` / `hold` / `lowsqi`)로 판단 보류·신호 품질 낮음 화면 확인용.
   - `USE_DUMMY_MAIN_MODEL=true`로 켜면 모델 없이 메인 모델도 더미로 흉내 낸다(이때만 `fail`·`noface` 키워드가 얼굴 미검출로 동작).
   - 업로드·검증(파일 손상, 10초 미만), 얼굴 검출률 기준(예시 70%), 융합 판정 규칙은 항상 실제로 동작한다.
 - 분석용 이미지는 `backend/Dockerfile`로 만든다(Python 3.10, PyTorch CPU, efficientnet_pytorch, OpenCV, dlib + 웹 서버 라이브러리).
