@@ -34,7 +34,7 @@ docker-compose.yml    Redis + API 서버 + 워커
 | 모델 가중치 (`effnb4_best.pth`, dlib 랜드마크) | `D:\Deepfake_Models` | `/mnt/d/Deepfake_Models` |
 
 코드에서는 경로를 환경변수(`DATASET_DIR`, `MODEL_DIR`)로 받는다.
-**FaceForensics++는 rPPG 특징 분석에만 쓴다. 메인 모델·융합·5단계 최종 평가에는 쓰지 않는다**(메인 모델의 학습 데이터).
+**FaceForensics++는 rPPG 특징 분석과 P_rppg 분류기 학습(5단계, c0·Deepfakes)에만 쓴다. 메인 모델·융합·5단계 최종 평가에는 쓰지 않는다**(메인 모델의 학습 데이터).
 메인 모델은 FF++에 돌리지 않는다. 위치 `D:\Deepfake_Datasets\FaceForensics++`(컨테이너 `/data/FaceForensics++`).
 Celeb-DF의 `List_of_testing_videos.txt` 518개는 최종 평가 전용이다. UBFC-rPPG(정답 심박 있음)는 rPPG 정확도 확인에만 쓴다.
 

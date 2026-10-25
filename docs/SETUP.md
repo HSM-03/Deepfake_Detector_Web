@@ -136,7 +136,7 @@ D:\Deepfake_Datasets\
 |---|---|---|
 | Celeb-DF v2 | 주 데이터셋. 실험·평가 | `List_of_testing_videos.txt` 518개는 **최종 평가 전용** — 학습·기준값·α 결정에 쓰지 않음 |
 | UBFC-rPPG | 정답 심박이 있어 **rPPG 심박 정확도 확인** | 딥페이크 판별 학습·평가 |
-| FaceForensics++ | **rPPG 특징 분석에만** (같은 영상의 압축 단계별 비교) | **메인 모델·융합·최종 평가 금지** — 메인 모델의 학습 데이터라 성능이 부풀려짐. 메인 모델을 FF++에 돌리지 않음 |
+| FaceForensics++ | **rPPG 특징 분석과 P_rppg 분류기 학습에만** (압축 단계별 비교, 5단계 분류기 학습·시험) | **메인 모델·융합·최종 평가 금지** — 메인 모델의 학습 데이터라 성능이 부풀려짐. 메인 모델을 FF++에 돌리지 않음 |
 
 ### 공통: 각자 신청, 파일은 팀원에게 받기
 - 데이터셋 이용 약관에 각자 동의해야 하므로 **본인 이름으로 직접 신청**합니다(아래 6-1, 6-3).
@@ -178,8 +178,8 @@ D:\Deepfake_Datasets\
 - 신청서: https://github.com/ondyari/FaceForensics 의 Google 폼(약관 동의). 승인 메일로 내려받기 스크립트(`download.py`)가 옵니다.
 - 쓰는 것: original(youtube)과 Deepfakes의 **25쌍**, raw(c0)·c23 각 25편, c40 10편. 4단계 분석(`check_rppg_separability --ffpp`)이 이 쌍으로 판정했습니다.
   `download.py`는 영상 번호를 골라 받을 수 없으므로 **팀원에게 폴더째 받습니다.**
-- 5단계에서 FF++ c0로 rPPG 분류기를 학습하는 안을 검토 중입니다(규칙 범위는 확인 후 결정, `docs/backend-plan.md` "5단계에서 정할 것").
-  학습용 영상을 더 받게 되면 그때 이 문서를 고칩니다.
+- 5단계 분류기용 영상(c0, Deepfakes 200쌍)은 **50쌍씩 받아 특징만 뽑고 지웁니다.** 영상을 골라 받는 도우미 `ffpp_pick.py`를 `download.py` 옆에 둡니다(저장소 밖, 팀원에게 받음).
+  뽑은 특징은 `backend/out/stage5/ffpp_features.jsonl`(깃 제외)이며, 같은 결과를 쓰려면 이 파일을 팀원에게 받으면 됩니다. 쌍 목록은 `docs/stage5-preregistration.md`에 있습니다.
 
 ### 6-4. 개수 확인
 PowerShell:

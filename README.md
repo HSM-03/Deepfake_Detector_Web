@@ -109,7 +109,7 @@ docker compose up --build
 
 - **Celeb-DF v2**로 실험·평가합니다. 데이터셋은 이용 약관에 따라 저장소에 포함하지 않으며, 데이터셋 인물 얼굴 이미지도 올리지 않습니다.
   - `List_of_testing_videos.txt`의 518개는 최종 평가에만 씁니다.
-- **FaceForensics++**는 rPPG 특징 분석(압축 강도별 비교)에만 씁니다. 메인 모델의 학습 데이터라서 메인 모델·융합·최종 평가에는 쓰지 않습니다.
+- **FaceForensics++**는 rPPG 특징 분석(압축 강도별 비교)과 rPPG 분류기 학습에만 씁니다. 메인 모델의 학습 데이터라서 메인 모델·융합·최종 평가에는 쓰지 않습니다.
 - **UBFC-rPPG**(Bobbia et al., 2017)는 정답 심박이 있어 rPPG 정확도 확인에만 씁니다.
 - 메인 모델 가중치와 얼굴 정렬 방식은 [DeepfakeBench](https://github.com/SCLBD/DeepfakeBench)(© 2023 CUHK(SZ), CC BY-NC 4.0)를 따릅니다.
   - `backend/analysis/face_align.py`는 DeepfakeBench 전처리를 옮긴 코드입니다(출처는 파일 머리말에 표기).
