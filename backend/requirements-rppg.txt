@@ -7,3 +7,5 @@ flatbuffers==25.12.19
 protobuf==4.25.9
 matplotlib==3.10.9
 scipy==1.15.3
+# 5단계: rPPG 특징으로 P_rppg 분류기 학습(로지스틱 회귀/SVM)
+scikit-learn==1.6.1
