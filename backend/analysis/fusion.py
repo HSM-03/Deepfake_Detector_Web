@@ -3,7 +3,7 @@
 
   w = α·SQI,  S = (1 − w)·P_model + w·P_rppg
   - SQI ≥ 하한 이고 |P_model − P_rppg| ≥ 상충 임계 → 판단 보류 (S는 내지 않는다)
-  - 그 외: S ≥ 가짜 기준 → 가짜, S ≤ 진짜 기준 → 진짜, 그 사이 → BOUNDARY_VERDICT (미결정, 예시값)
+  - 그 외: S ≥ 가짜 기준 → 가짜, S ≤ 진짜 기준 → 진짜, 그 사이 → BOUNDARY_VERDICT (5-5에서 검증 세트로 정함)
   - SQI < 하한 → 'rPPG 기여도 낮음' 표시
 
 임계값은 모두 settings.py에 있다(예시값). 판정에 쓴 임계값은 결과와 함께 저장한다(thresholds()).
@@ -62,5 +62,5 @@ def fuse(p_model: float, p_rppg: float, sqi: float) -> FusionOutcome:
     elif score <= settings.SCORE_REAL_MAX:
         verdict = 'real'
     else:
-        verdict = settings.BOUNDARY_VERDICT  # 미결정 구간 (예시값)
+        verdict = settings.BOUNDARY_VERDICT  # 경계 구간 (5-5에서 정함)
     return FusionOutcome(verdict=verdict, score=round(score, 3), **common)

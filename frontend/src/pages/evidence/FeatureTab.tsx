@@ -53,8 +53,8 @@ export function FeatureTab({ evidence }: Props) {
             <tr>
               <th scope="col">특징</th>
               <th scope="col">측정값</th>
-              {/* 지금 기준값은 신호가 좋았던 영상 10편으로 잡은 임시값이다(docs/backend-plan.md 4-3). 5단계에서 재산출하면 바꾼다 */}
-              <th scope="col">임시 기준</th>
+              {/* 실제 얼굴 영상(FF++ c0 학습 쌍의 진짜 118편 + UBFC 3편) 분포로 정한 기준(docs/backend-plan.md 5-4) */}
+              <th scope="col">실제 얼굴 기준</th>
               <th scope="col">판단</th>
             </tr>
           </thead>
@@ -79,7 +79,8 @@ export function FeatureTab({ evidence }: Props) {
           </tbody>
         </table>
         <p className="caption">
-          임시 기준입니다 — 신호가 좋았던 영상 10편으로 잡았고, 5단계에서 학습용 진짜 영상으로 다시 산출합니다.
+          기준은 실제 얼굴 영상 121편의 분포입니다 — ○는 실제 영상의 75%, ○·△는 95%가 들어가는 범위입니다. 말하는 영상이 많아
+          범위가 넓고, 이 특징들만으로는 진짜와 가짜가 약하게만 구분됩니다(P_rppg 분류기 시험 AUC 0.58).
         </p>
       </section>
 

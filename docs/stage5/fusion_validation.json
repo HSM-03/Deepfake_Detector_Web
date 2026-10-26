@@ -1,0 +1,56 @@
+{
+ "mode": "classifier",
+ "failed": 3,
+ "candidates": {
+  "real": {
+   "main_only": {
+    "auc": 0.8923,
+    "confident_error": 0.1878,
+    "hold_rate": 0.0,
+    "accuracy_decided": 0.8122,
+    "n": 197
+   },
+   "fusion": {
+    "auc": 0.894,
+    "confident_error": 0.1878,
+    "hold_rate": 0.0508,
+    "accuracy_decided": 0.8021,
+    "n": 197
+   }
+  },
+  "fake": {
+   "main_only": {
+    "auc": 0.8923,
+    "confident_error": 0.1726,
+    "hold_rate": 0.0,
+    "accuracy_decided": 0.8274,
+    "n": 197
+   },
+   "fusion": {
+    "auc": 0.894,
+    "confident_error": 0.1624,
+    "hold_rate": 0.0508,
+    "accuracy_decided": 0.8289,
+    "n": 197
+   }
+  },
+  "hold": {
+   "main_only": {
+    "auc": 0.8923,
+    "confident_error": 0.1015,
+    "hold_rate": 0.1574,
+    "accuracy_decided": 0.8795,
+    "n": 197
+   },
+   "fusion": {
+    "auc": 0.894,
+    "confident_error": 0.0863,
+    "hold_rate": 0.2284,
+    "accuracy_decided": 0.8882,
+    "n": 197
+   }
+  }
+ },
+ "chosen_boundary": "fake",
+ "not_worse": true
+}
