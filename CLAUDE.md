@@ -18,11 +18,31 @@ backend/
 docker-compose.yml    Redis + API 서버 + 워커
 ```
 
-진행 상황은 `docs/backend-plan.md`의 각 단계 아래 "결과"에 기록한다. 지금은 5단계 5-5까지 끝났다 — P_rppg 분류기(FF++ c0 학습)를 서비스에 연결했고, 남은 것은 5-6 최종 평가와 5-7 정리다.
+진행 상황은 `docs/backend-plan.md`의 각 단계 아래 "결과"에 기록한다. 지금은 5단계 5-5까지 끝났고, **rPPG 분류기 개선(아래 "지금 진행 중")**을 하고 있다. 5-6 최종 평가는 13주차 초 최종 버전 고정 뒤 한 번 한다.
 
 - **API 형식의 기준은 `frontend/src/types/api.ts`다.** 백엔드 응답은 이 타입과 정확히 맞아야 한다.
   형식을 바꿔야 하면 바꾸기 전에 사용자에게 알리고, 타입 → 목(`frontend/src/mocks/`) → 백엔드를 함께 고친다.
 - 백엔드 작업은 `docs/backend-plan.md`의 단계 순서를 따른다. 각 단계는 완료 기준을 채우고 보고한 뒤 다음으로 넘어간다.
+
+## 지금 진행 중: rPPG 분류기 개선 (브랜치 `feat/rppg-region`)
+
+이어받은 사람은 시작 전에 **`docs/rppg-region-preregistration.md`(규칙의 기준)**와 `docs/backend-plan.md` "0. 다음 할 일"을 읽는다.
+
+- **작업 노트북**: 작업을 이어받는 팀원의 노트북. 인수인계 목록·FF++ 약관 확인 항목은 `backend-plan.md` 0-1.
+- **목표**: 부위별(안쪽 얼굴–바깥쪽) 맥박 비교로 rPPG를 강화해 "rPPG가 메인 모델이 놓치는 가짜를 더 잡는다"를 다시 시험. 효과가 없으면 한계 분석으로 정리. 결과가 약해도 그대로 기록.
+- **결정 사항**
+  - 시나리오: 공유·신뢰 전 의심 영상을 거르는 1차 검사. **가짜를 놓치는 것**('진짜'로 판정)이 더 중요한 오류 — 가짜·판단 보류는 걸러낸 것으로 센다.
+  - 주 지표: **진짜 오판율(진짜 → 가짜·보류) ≤ 10%** 안에서 가짜 놓침률 최소. 편수·95% 신뢰구간을 함께 보고. 보류 ≤ 20% 유지.
+  - **rPPG는 어떤 경우에도 '진짜' 판정을 만들지 않는다**: 메인 모델 진짜 + SQI ≥ 하한 + P_rppg ≥ τ → 보류, 메인 모델 가짜 + SQI ≥ 하한 + rPPG 정상 → 보류.
+    S 가중 평균은 판정에서 빼고 화면 표시용(상세제안서 대비 설계 변경, 서비스 반영은 12주차).
+  - 학습 조작 방식 Deepfakes·FaceSwap, 처음 보는 방식 FaceShifter·Face2Face·NeuralTextures. 계속 여부는 ②의 FaceShifter로 11주차 말에 결정.
+- **금지**
+  - **③ rPPG 최종 시험 데이터와 ④ 시스템 최종 평가(Celeb-DF 518편 + 팀원 영상)는 13주차 초 최종 버전 고정 전까지 열지 않는다.** 개발 중 판단은 ② 개발 검증 데이터로만.
+  - **서비스 코드(`backend/app/`, 서비스가 쓰는 `backend/analysis/`)는 12주차 전까지 고치지 않는다.** 새 코드는 별도 모듈·스크립트로. 메인 모델은 바꾸지 않는다.
+  - **데이터셋 인물 얼굴(Celeb-DF·FF++·UBFC)을 저장소·문서·그림에 넣지 않는다.** 이름·학번도 저장소에 쓰지 않는다(공개 저장소).
+  - 사전 등록을 결과를 본 뒤 고치지 않는다(바꿀 때는 문서 끝 "변경 기록"에 이유와 함께).
+  - FF++ 데이터와 `download.py`·서버 주소는 팀 밖으로 공유하지 않고 저장소에 넣지 않는다.
+- **일정**: 13주차 초 고정, 14주차 시스템 완성(반드시). 일정은 이어받는 팀원 확인 후 확정. 밀리면 작업 4(맥박 지도 + CNN)부터 뺀다.
 
 ## 데이터셋·모델 가중치
 
@@ -34,7 +54,7 @@ docker-compose.yml    Redis + API 서버 + 워커
 | 모델 가중치 (`effnb4_best.pth`, dlib 랜드마크) | `D:\Deepfake_Models` | `/mnt/d/Deepfake_Models` |
 
 코드에서는 경로를 환경변수(`DATASET_DIR`, `MODEL_DIR`)로 받는다.
-**FaceForensics++는 rPPG 특징 분석과 P_rppg 분류기 학습(5단계, c0·Deepfakes)에만 쓴다. 메인 모델·융합·5단계 최종 평가에는 쓰지 않는다**(메인 모델의 학습 데이터).
+**FaceForensics++는 rPPG 특징 분석과 P_rppg 분류기 학습·시험(c0, Deepfakes·FaceSwap·FaceShifter·Face2Face·NeuralTextures)에만 쓴다. 메인 모델·융합·5단계 최종 평가에는 쓰지 않는다**(메인 모델의 학습 데이터).
 메인 모델은 FF++에 돌리지 않는다. 위치 `D:\Deepfake_Datasets\FaceForensics++`(컨테이너 `/data/FaceForensics++`).
 Celeb-DF의 `List_of_testing_videos.txt` 518개는 최종 평가 전용이다. UBFC-rPPG(정답 심박 있음)는 rPPG 정확도 확인에만 쓴다.
 
