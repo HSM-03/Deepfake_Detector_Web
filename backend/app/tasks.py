@@ -4,7 +4,8 @@
   1. 업로드·검증: 영상 정보를 실제로 읽는다. 열 수 없으면 '파일 손상', 10초 미만이면 '길이 부족'으로 분석 불가
   2. 전처리·ROI 추적  ┐ 메인 모델: 실제 EfficientNet-B4(analysis/main_model.py). 얼굴 검출률이 기준 미만이면 '얼굴 미검출'
   3. 메인 모델 판별   ┘ USE_DUMMY_MAIN_MODEL을 켜면 모델 없이 더미 값으로 흉내 낸다
-  4. rPPG 신호 분석     실제(4단계): 얼굴 ROI 추적 → 특징 6개 → SQI. P_rppg는 5단계 분류기 전까지 P_model 값(USE_DUMMY_P_RPPG)
+  4. rPPG 신호 분석     실제: 얼굴 ROI 추적 → 특징 6개 → SQI → P_rppg 분류기(5단계, analysis/p_rppg.py).
+                       USE_DUMMY_P_RPPG를 켜면 예전처럼 P_rppg = P_model(임시 값)
                        USE_DUMMY_RPPG를 켜면 예전 더미 시나리오(파일 이름 키워드)로 동작한다
   5. 융합 판정          판정 규칙은 어느 경우든 실제 규칙(fusion.py)을 적용한다
 
@@ -16,7 +17,7 @@ import time
 import traceback
 from pathlib import Path
 
-from analysis import dummy, fusion, interpret, rppg_evidence, rppg_features, sqi
+from analysis import dummy, fusion, interpret, p_rppg as p_rppg_classifier, rppg_evidence, rppg_features, sqi
 from analysis import rppg as rppg_signal
 from analysis.stream_info import stream_info
 from analysis import settings as analysis_settings
@@ -226,7 +227,8 @@ def _analyze(db, job: Job, tracker: Tracker) -> str:
 def _real_rppg_stage(job: Job, tracker: Tracker, main: dummy.MainModelValues) -> dict:
     """
     실제 rPPG: 영상 전체 프레임의 얼굴 ROI 추적 → 특징 6개(rppg_features, FF++ 검증과 같은 함수) → SQI.
-    P_rppg는 5단계 분류기를 붙이기 전까지 P_model 값을 쓴다(USE_DUMMY_P_RPPG) — 판정은 바뀌지 않고, 신호·근거는 실제다.
+    P_rppg는 특징 6개로 분류기(FF++ c0로 학습한 로지스틱 회귀, analysis/p_rppg_model.json)가 낸다.
+    USE_DUMMY_P_RPPG를 켜면 예전처럼 P_model 값을 임시로 쓴다(판정은 메인 모델 단독과 같음).
     추적 중에는 진행률을 쓸 때마다 취소를 확인하므로 취소하면 바로 멈춘다.
     """
     path = Path(job.stored_path)
@@ -248,19 +250,22 @@ def _real_rppg_stage(job: Job, tracker: Tracker, main: dummy.MainModelValues) ->
     tracker.log('rppg', f'rPPG 분석 완료 — 심박 {"측정 실패" if hr is None else f"{hr:.0f}BPM"}, SQI {quality.value:.2f}'
                         f' (가장 약한 항목: {weakest}), 얼굴 추적 {traces.tracked_rate:.0%}'
                         + (f', 영상 {meta.duration_sec:.0f}초 중 앞 {analyzed_sec:.0f}초 분석' if truncated else ''))
-    if not analysis_settings.USE_DUMMY_P_RPPG:  # 5단계에서 분류기 점수로 바꾼다
-        raise AnalysisStopped(_unknown_failure('rppg', 'P_rppg 분류기가 아직 연결되지 않았습니다 (USE_DUMMY_P_RPPG=false, 5단계)'))
-    p_rppg = main.p_model
+    provisional = analysis_settings.USE_DUMMY_P_RPPG
+    p_rppg = main.p_model if provisional else p_rppg_classifier.p_rppg(features.values)
+    if not provisional:
+        tracker.log('rppg', f'P_rppg 분류기 — {p_rppg:.2f} ({"가짜" if p_rppg >= 0.5 else "진짜"} 쪽)')
     roi_bpm = {k: None if b is None else round(float(b), 1) for k, b in features.roi_bpm.items()}
     profile = main.profile or []
 
     def evidence(roi: str, outcome: fusion.FusionOutcome, axis_summary: dict) -> dict:
         return rppg_evidence.build(job.id, roi, traces, features, profile, axis_summary, outcome.rppg_low_contribution,
-                                   analyzed_sec, truncated, provisional=True)
+                                   analyzed_sec, truncated, provisional=provisional)
 
     return {'p_rppg': p_rppg, 'sqi': quality.value, 'sqi_components': quality.components, 'roi_bpm': roi_bpm,
-            'mirrors': True, 'measured': {'hr': hr, 'weakest': quality.weakest, 'truncated_sec': analyzed_sec if truncated else None},
-            'evidence': evidence, 'provisional': True}
+            'mirrors': provisional,
+            'measured': {'hr': hr, 'weakest': quality.weakest, 'truncated_sec': analyzed_sec if truncated else None,
+                         'provisional': provisional},
+            'evidence': evidence, 'provisional': provisional}
 
 
 def _dummy_rppg_stage(job: Job, tracker: Tracker, main: dummy.MainModelValues, dummy_main: bool) -> dict:

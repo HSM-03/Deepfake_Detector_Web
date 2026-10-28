@@ -1,0 +1,9 @@
+직접 찍은 영상의 P_rppg (참고 확인 — 진짜 쪽 = 0.5 미만)
+  06_rear_still_hr92.mp4       P_rppg 0.176 진짜 쪽
+  07_rear_talk_hr88.mp4        P_rppg 0.206 진짜 쪽
+  08_webcam_still_hr84.mp4     P_rppg 0.416 진짜 쪽
+  09_webcam_talk_hr80.mp4      P_rppg 0.478 진짜 쪽
+  10_selfie_still_hr78.mp4     P_rppg 0.249 진짜 쪽
+  11_selfie_talk_hr80.mp4      P_rppg 0.296 진짜 쪽
+  12_webcam_rest_hr62.mp4      P_rppg 0.335 진짜 쪽
+  13_webcam_talk_hr73.mp4      P_rppg 0.409 진짜 쪽

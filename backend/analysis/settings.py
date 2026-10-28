@@ -27,8 +27,8 @@ USE_DUMMY_MAIN_MODEL = _env_flag('USE_DUMMY_MAIN_MODEL', False)
 # rPPG 신호 분석(SQI·ROI 심박·특징·근거 차트). 4단계에서 실제 계산을 붙여 기본으로 끈다.
 # 켜면(USE_DUMMY_RPPG=true) 예전처럼 더미 시나리오로 동작한다 — 파일 이름 키워드(hold, lowsqi, fake)로 판단 보류 등 화면을 확인할 때 쓴다
 USE_DUMMY_RPPG = _env_flag('USE_DUMMY_RPPG', False)
-# P_rppg(rPPG 축의 진짜/가짜 점수)는 5단계 분류기 전까지 P_model 값을 그대로 쓴다(판정을 바꾸지 않음). 신호 분석은 실제다
-USE_DUMMY_P_RPPG = _env_flag('USE_DUMMY_P_RPPG', True)
+# P_rppg(rPPG 축의 진짜/가짜 점수): 기본은 5단계 분류기(analysis/p_rppg.py, FF++ c0 학습). 켜면(true) 예전처럼 P_model 값을 임시로 쓴다
+USE_DUMMY_P_RPPG = _env_flag('USE_DUMMY_P_RPPG', False)
 # 더미 모드에서 단계마다 걸리는 시간(초). 진행 화면을 확인할 수 있을 만큼만 기다린다 (합계 약 12초)
 # rppg_after_main: 메인 모델이 실제일 때, 메인 모델이 끝난 뒤 더미 rPPG를 채우는 시간
 DUMMY_STAGE_SECONDS = {'preprocess': 4.0, 'model': 5.0, 'rppg': 6.0, 'fusion': 2.0, 'rppg_after_main': 2.0}
@@ -46,9 +46,10 @@ SCORE_FAKE_MIN = 0.6  # S가 이 값 이상이면 가짜
 CONFLICT_GAP = 0.4  # |P_model − P_rppg|가 이 값 이상이면 두 축이 상충
 SQI_MIN = 0.5  # SQI 하한. 미만이면 'rPPG 기여도 낮음'
 SQI_GOOD_MIN = 0.7  # SQI 등급: 이 값 이상 '양호', SQI_MIN 이상 '보통', 그 아래 '낮음'
-# 미결정: S가 경계 구간(SCORE_REAL_MAX < S < SCORE_FAKE_MIN)인데 두 축이 상충하지 않을 때의 판정.
-# 문서에 정의가 없어 프론트엔드 목과 같게 '진짜'로 둔 예시값이다. 'real' 또는 'fake'
-BOUNDARY_VERDICT = 'real'
+# S가 경계 구간(SCORE_REAL_MAX < S < SCORE_FAKE_MIN)인데 두 축이 상충하지 않을 때의 판정 — 5-5에서 정함(2026-10-26).
+# 사전 등록(docs/stage5-preregistration.md 5절) 규칙: Celeb-DF 검증 세트에서 보류 비율 20% 이하 후보 중 확신 오류율 최소.
+# 'hold'는 확신 오류가 가장 낮았지만(8.6%) 보류 22.8%로 상한을 넘었고, 'fake' 16.2% < 'real' 18.8%. 'real' | 'fake'
+BOUNDARY_VERDICT = 'fake'
 
 # ── 메인 모델 (기능 3) ──
 # 영상에서 고르게 뽑을 프레임 수. DeepfakeBench 전처리 기본값(32)과 같게 둔다
@@ -142,15 +143,17 @@ SQI_BACKGROUND_INBAND = (0.015, 0.004)
 SQI_HEAD_MOTION = (0.03, 0.005)
 SQI_MOUTH_MOTION = (0.008, 0.001)  # 영상 3편(웹캠 09·11·13번, 말하기) 기준 예시값
 
-# ── rPPG 특징 표의 기준값(화면의 "실제 얼굴 기준 (예시)"와 ○△× 판단) — 4-3 ──
-# 신호가 좋았던 영상 10편(UBFC 원본 3, 휴대폰·웹캠 원본 7)의 분포로 잡은 예시값. 5단계에서 학습 데이터 분포로 다시 정한다.
+# ── rPPG 특징 표의 기준값(화면의 ○△× 판단) — 5-4 (2026-10-26) ──
+# 실제 얼굴 영상(FF++ c0 학습 쌍의 진짜 118편 + UBFC 원본 3편)의 분포: ○ = 75%가 들어가는 범위, △ = 95%가 들어가는 범위.
+# 규칙은 값을 계산하기 전에 정했다(scripts/feature_reference.py). FF++ 진짜 영상은 말하는 영상이 많아 맥박 신호가 깨끗하지 않아
+# 4-3의 임시 기준(신호 좋은 10편: ROI 간 σ ≤ 3, 일치도 ≥ 0.40 등)보다 훨씬 느슨하다 — '맥박이 깨끗한가'가 아니라 '실제 얼굴 영상의 흔한 범위인가'다.
 # (방향, ○ 경계, △ 경계): 'min'이면 값이 클수록 좋음(○ ≥ 첫 값, △ ≥ 둘째 값), 'max'면 작을수록 좋음
 RPPG_FEATURE_JUDGE = {
-    'snr': ('min', -1.5, -3.5),  # 좋은 영상 중앙값 −1.2dB, Celeb-real −4.2
-    'spectral_entropy': ('max', 0.88, 0.91),  # 좋은 영상 75% 0.88, Celeb-real 중앙 0.90
-    'roi_bpm_std': ('max', 3.0, 8.0),  # 좋은 영상 중앙 0.9BPM, Celeb-real 21.3
-    'phase_consistency': ('min', 0.40, 0.20),  # 좋은 영상 중앙 0.43, Celeb-real 0.14
-    'window_bpm_var': ('max', 8.0, 12.0),  # 좋은 영상 75% 8.7BPM, Celeb-real 중앙 12.2
+    'snr': ('min', -4.57, -6.12),  # 기준 영상 중앙값 −3.50dB (4-3 임시: −1.5 / −3.5)
+    'spectral_entropy': ('max', 0.93, 0.95),  # 중앙값 0.91 (4-3 임시: 0.88 / 0.91)
+    'roi_bpm_std': ('max', 22.48, 33.57),  # 중앙값 14.5BPM (4-3 임시: 3 / 8)
+    'phase_consistency': ('min', 0.06, -0.06),  # 중앙값 0.14 (4-3 임시: 0.40 / 0.20)
+    'window_bpm_var': ('max', 23.67, 38.47),  # 중앙값 16.3BPM (4-3 임시: 8 / 12)
 }
 # rPPG는 모든 프레임을 처리해 영상 길이에 비례해 오래 걸리므로(1080p 30초에 약 17초) 앞 이 길이만 분석한다.
 # 업로드 길이 제한은 없다(용량 500MB만). 메인 모델은 영상 전체에서 32프레임을 그대로 뽑는다

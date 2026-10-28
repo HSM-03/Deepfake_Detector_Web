@@ -44,7 +44,7 @@ def interpretation(
     """
     sentences = [_model_sentence(p_model, face_count, profile)]
     if rppg_measured is not None:
-        sentences.append(_measured_sentence(outcome, sqi, rppg_measured))
+        sentences.append(_measured_sentence(outcome, sqi, p_rppg, rppg_measured))
         sentences.append(_conclusion(outcome, mention_low=False))  # 신호 품질 문장을 앞에서 이미 말했다
     else:
         rppg = _rppg_sentence(p_rppg, sqi, rppg_mirrors_model)
@@ -53,16 +53,19 @@ def interpretation(
     return ' '.join(sentences)
 
 
-def _measured_sentence(outcome: FusionOutcome, sqi: float, measured: dict) -> str:
-    """실제 rPPG 신호 + 임시 P_rppg(= P_model, 5단계 분류기 전)"""
+def _measured_sentence(outcome: FusionOutcome, sqi: float, p_rppg: float, measured: dict) -> str:
+    """실제 rPPG 신호 + P_rppg(분류기 값, 또는 USE_DUMMY_P_RPPG일 때 임시 값 = P_model)"""
     weakest = SQI_COMPONENT_LABELS.get(measured.get('weakest'), measured.get('weakest'))
     if outcome.rppg_low_contribution:
         return (f'rPPG 신호 품질이 낮아(SQI {sqi:.2f}, 가장 약한 항목: {weakest}) rPPG는 판정에 반영되지 않았습니다.')
     hr = measured.get('hr')
     where = f'앞 {measured["truncated_sec"]:.0f}초의 ' if measured.get('truncated_sec') else ''
     found = f'{where}rPPG 신호에서 심박 약 {hr:.0f}BPM을 측정했습니다' if hr is not None else f'{where}rPPG 신호에서 심박을 찾지 못했습니다'
-    return (f'{found}(신호 품질 SQI {sqi:.2f}). rPPG의 진짜/가짜 점수는 분류기(5단계)를 붙이기 전이라 '
-            '메인 모델 값으로 두어 판정에 영향을 주지 않습니다.')
+    if measured.get('provisional', True):
+        return (f'{found}(신호 품질 SQI {sqi:.2f}). rPPG의 진짜/가짜 점수는 분류기(5단계)를 붙이기 전이라 '
+                '메인 모델 값으로 두어 판정에 영향을 주지 않습니다.')
+    return (f'{found}(신호 품질 SQI {sqi:.2f}). rPPG 분류기는 이 신호를 {_ro(p_rppg)} {_side(p_rppg)} 쪽으로 평가했습니다'
+            f'(반영 비중 w = {outcome.w:.2f}).')
 
 
 def _model_sentence(p_model: float, face_count: int | None, profile: list[dict] | None) -> str:
@@ -104,7 +107,7 @@ def _conclusion(outcome: FusionOutcome, mention_low: bool = True) -> str:
         return f'종합 점수 S = {_ro(s)} 진짜 기준({real_max:.2f}) 이하라 실제 촬영 영상일 가능성이 높습니다.' + low
     label = '진짜' if outcome.verdict == 'real' else '가짜'
     return (f'종합 점수 S = {_ro(s)} 진짜·가짜 기준 사이({real_max:.2f}~{fake_min:.2f})의 경계 구간이라, '
-            f'현재 규칙(예시값)에 따라 {label}로 판정했습니다. 확신하기 어려운 결과이니 판정 근거를 함께 확인해 주세요.' + low)
+            f'검증 세트로 정한 규칙에 따라 {label}로 판정했습니다. 확신하기 어려운 결과이니 판정 근거를 함께 확인해 주세요.' + low)
 
 
 def axis_summary(outcome: FusionOutcome, p_model: float, p_rppg: float, sqi: float, *, rppg_mirrors_model: bool = False,
@@ -116,8 +119,9 @@ def axis_summary(outcome: FusionOutcome, p_model: float, p_rppg: float, sqi: flo
             weakest = SQI_COMPONENT_LABELS.get(rppg_measured.get('weakest'), rppg_measured.get('weakest'))
             return (f'rPPG 미반영(신호 품질 낮음): SQI가 {_ro(sqi)} 하한({settings.SQI_MIN:.2f}) 미만이고 가장 약한 항목은 {weakest}입니다'
                     f'(w = {outcome.w:.2f}). 본 판정은 메인 모델 결과입니다.')
-        return (f'rPPG 신호는 측정했지만(SQI {sqi:.2f}) 진짜/가짜 점수는 분류기(5단계) 전이라 메인 모델과 같은 값({p_model:.2f})으로 두었습니다. '
-                f'{gap}, 판정은 메인 모델 단독 결과와 같습니다.')
+        if rppg_measured.get('provisional', True):
+            return (f'rPPG 신호는 측정했지만(SQI {sqi:.2f}) 진짜/가짜 점수는 분류기(5단계) 전이라 메인 모델과 같은 값({p_model:.2f})으로 두었습니다. '
+                    f'{gap}, 판정은 메인 모델 단독 결과와 같습니다.')
     if rppg_mirrors_model:
         return f'rPPG 축은 아직 연결 전이라 메인 모델과 같은 값({p_model:.2f})으로 두었습니다. {gap}, 판정은 메인 모델 단독 결과와 같습니다.'
     if outcome.rppg_low_contribution:

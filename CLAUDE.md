@@ -18,7 +18,7 @@ backend/
 docker-compose.yml    Redis + API 서버 + 워커
 ```
 
-진행 상황은 `docs/backend-plan.md`의 각 단계 아래 "결과"에 기록한다. 지금은 4단계(rPPG)까지 끝났다 — rPPG 신호 분석은 웹에 연결됐고, P_rppg(분류기)는 5단계까지 임시 값(P_model)이다.
+진행 상황은 `docs/backend-plan.md`의 각 단계 아래 "결과"에 기록한다. 지금은 5단계 5-5까지 끝났다 — P_rppg 분류기(FF++ c0 학습)를 서비스에 연결했고, 남은 것은 5-6 최종 평가와 5-7 정리다.
 
 - **API 형식의 기준은 `frontend/src/types/api.ts`다.** 백엔드 응답은 이 타입과 정확히 맞아야 한다.
   형식을 바꿔야 하면 바꾸기 전에 사용자에게 알리고, 타입 → 목(`frontend/src/mocks/`) → 백엔드를 함께 고친다.
@@ -34,7 +34,7 @@ docker-compose.yml    Redis + API 서버 + 워커
 | 모델 가중치 (`effnb4_best.pth`, dlib 랜드마크) | `D:\Deepfake_Models` | `/mnt/d/Deepfake_Models` |
 
 코드에서는 경로를 환경변수(`DATASET_DIR`, `MODEL_DIR`)로 받는다.
-**FaceForensics++는 rPPG 특징 분석에만 쓴다. 메인 모델·융합·5단계 최종 평가에는 쓰지 않는다**(메인 모델의 학습 데이터).
+**FaceForensics++는 rPPG 특징 분석과 P_rppg 분류기 학습(5단계, c0·Deepfakes)에만 쓴다. 메인 모델·융합·5단계 최종 평가에는 쓰지 않는다**(메인 모델의 학습 데이터).
 메인 모델은 FF++에 돌리지 않는다. 위치 `D:\Deepfake_Datasets\FaceForensics++`(컨테이너 `/data/FaceForensics++`).
 Celeb-DF의 `List_of_testing_videos.txt` 518개는 최종 평가 전용이다. UBFC-rPPG(정답 심박 있음)는 rPPG 정확도 확인에만 쓴다.
 
@@ -66,8 +66,9 @@ Celeb-DF의 `List_of_testing_videos.txt` 518개는 최종 평가 전용이다. U
   - **메인 모델은 실제**(3단계). 워커가 처음 작업을 받을 때 모델을 한 번 불러 둔다.
   - **rPPG 신호 분석도 실제**(4단계): 얼굴 ROI 추적 → 심박·특징 6개·SQI, 근거 화면의 파형·스펙트럼도 실제 값이다.
     영상 1편 약 30~60초(메인 모델 약 25~35초 + rPPG 3~17초, 해상도·길이에 따라).
-  - **P_rppg만 임시 값**(`USE_DUMMY_P_RPPG`, 기본 켜짐): 5단계 분류기 전까지 P_model과 같은 값이라 판정은 메인 모델 단독 결과와 같다.
-    SQI가 하한(0.5) 미만이면 화면에 "rPPG 미반영(신호 품질 낮음)"이 나온다.
+  - **P_rppg도 실제**(5단계): 특징 6개로 로지스틱 회귀 분류기(`analysis/p_rppg_model.json`, FF++ c0 학습, 시험 AUC 0.58 — 구분력 약함)가 낸다.
+    SQI가 하한(0.5) 이상이고 두 축이 0.4 이상 어긋나면 판단 보류, SQI가 하한 미만이면 "rPPG 미반영(신호 품질 낮음)"이 나온다.
+    `USE_DUMMY_P_RPPG=true`로 켜면 예전처럼 P_rppg = P_model(임시 값)으로 동작한다.
   - `USE_DUMMY_RPPG=true`로 켜면 예전 더미 시나리오로 동작한다: 파일명 키워드(`fake` / `hold` / `lowsqi`)로 판단 보류·신호 품질 낮음 화면 확인용.
   - `USE_DUMMY_MAIN_MODEL=true`로 켜면 모델 없이 메인 모델도 더미로 흉내 낸다(이때만 `fail`·`noface` 키워드가 얼굴 미검출로 동작).
   - 업로드·검증(파일 손상, 10초 미만), 얼굴 검출률 기준(예시 70%), 융합 판정 규칙은 항상 실제로 동작한다.
@@ -101,7 +102,7 @@ Celeb-DF의 `List_of_testing_videos.txt` 518개는 최종 평가 전용이다. U
 ## 작업 방식
 
 - 작업을 시작하기 전에 이해한 내용과 진행 계획을 사용자에게 확인받는다. 허락받은 범위는 끝까지 진행한 뒤 보고한다.
-- 미결정 사항(P_rppg 방향, S 0.4~0.6 비상충 판정, 임계값·α, 이력 API 세부, ZIP 내보내기)은 임의로 정하지 않는다.
+- 미결정 사항(임계값·α, 이력 API 세부, ZIP 내보내기)은 임의로 정하지 않는다. P_rppg 방향(1 = 가짜)과 경계 구간 판정(가짜)은 5단계에서 정했다.
   확정 전까지는 설정 파일 한 곳에 예시값으로 두고, 코드에 박지 않는다.
 - 상세제안서 스택에 없는 라이브러리를 추가하기 전에 사용자에게 확인한다.
 - 데이터셋 인물 얼굴이 담긴 이미지를 저장소나 문서에 넣지 않는다(초상권, Celeb-DF 이용 약관).
