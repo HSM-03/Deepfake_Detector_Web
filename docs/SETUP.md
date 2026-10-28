@@ -11,7 +11,7 @@
 | 4 | WSL2 + Docker 설치 | 백엔드 작업 시 필수 |
 | 5 | 모델 가중치 받기 | 백엔드 실행 시 필수 |
 | 6 | 데이터셋 받기 (Celeb-DF, UBFC-rPPG, FaceForensics++) | 실험(특징 추출·평가) 시 필수 |
-| 7 | 백엔드 실행과 화면 연결 | 필수 |
+| 7 | 팀원에게 받을 것, 백엔드 실행과 화면 연결 | 필수 |
 | 8 | 설치 확인 (다른 PC와 같은 결과가 나오는지) | 필수 |
 
 ---
@@ -195,6 +195,22 @@ PowerShell:
 ```
 
 ## 7. 백엔드 실행과 화면 연결
+
+### 7-0. 팀원에게 받을 것 (저장소에 없는 파일)
+
+클론만으로 코드·문서·학습된 P_rppg 분류기(`backend/analysis/p_rppg_model.json`)는 모두 받아진다. 아래는 깃에 없어서 USB 등으로 따로 받는다.
+
+| 구분 | 무엇 | 크기 | 받는 이유 | 놓을 곳 |
+|---|---|---|---|---|
+| **필수** | 가중치 폴더 `Deepfake_Models` | 약 170MB | 없으면 분석이 돌지 않음 | `D:\Deepfake_Models` (다른 곳이면 7-1 `.env`) |
+| **필수** | `Deepfake_Datasets\Celeb-DF-v2` | 9.5GB | 설치 확인(8절) 영상, 최종 평가(5-6) 518편 | `D:\Deepfake_Datasets\Celeb-DF-v2` |
+| 선택 | `backend\out\stage5\` 폴더 전체 | 1MB 미만 | FF++ 특징 기록(`ffpp_features.jsonl`), 검증 세트 결과(`celebdf_val.jsonl`), 묶음 목록 — **분류기를 다시 학습하거나 5단계 결과를 직접 다시 계산할 때만** | 저장소의 같은 위치 |
+| 선택 | `Deepfake_Datasets\UBFC-rPPG` | 5.2GB | 심박 정확도 스크립트·특징 기준값 재산출을 다시 돌릴 때 | `D:\Deepfake_Datasets\UBFC-rPPG` |
+| 선택 | `Deepfake_Datasets\FaceForensics++` | 5.2GB | 4단계 분석(압축 단계별 비교)을 다시 돌릴 때. `ffpp_pick.py`·`filelist.json` 포함 | `D:\Deepfake_Datasets\FaceForensics++` |
+| 선택 | `backend\out\`의 직접 찍은 영상 | 수백 MB | 시연·참고용. **찍힌 사람에게 넘겨도 되는지 먼저 확인** | 저장소의 같은 위치 |
+
+- 데이터셋은 **각자 사용 신청을 한 뒤** 받는다(6절).
+- `backend\out\stage5\`가 없어도 서비스(업로드 → 판정 → 근거 → 이력)와 최종 평가는 그대로 돈다.
 
 ### 7-1. 폴더 위치가 다를 때만: `.env`
 가중치·데이터셋을 `D:\Deepfake_Models`, `D:\Deepfake_Datasets`가 아닌 곳에 뒀다면, **저장소 루트**에 `.env` 파일을 만들고 WSL 경로로 적습니다.
