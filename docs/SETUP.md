@@ -33,10 +33,8 @@
 cd D:\
 git clone https://github.com/HSM-03/Deepfake_Detector_Web.git
 cd Deepfake_Detector_Web
-git switch docs/stage5-plan
 ```
 
-- **5단계 작업(P_rppg 분류기 등)은 `main`에 합치기 전까지 `docs/stage5-plan` 브랜치에 있습니다.** 합친 뒤에는 `main` 그대로 쓰면 됩니다.
 - C 드라이브 등 다른 위치에 받아도 됩니다. 바탕화면·문서처럼 OneDrive가 동기화하는 폴더와, 띄어쓰기·한글이 든 경로는 피합니다.
   다른 위치에 받으면 WSL에서는 `/mnt/c/...`처럼 그 경로로 들어가고, 데이터셋·가중치 위치는 7-1의 `.env`로 알려 줍니다.
 
@@ -254,8 +252,8 @@ VITE_USE_MOCK=false
    | `Celeb-DF-v2\Celeb-synthesis\id0_id16_0000.mp4` | 가짜 | 0.92 | 0.92 | 0.42 | 89 BPM | 0.01 (얼굴 크기) |
    | `Celeb-DF-v2\Celeb-real\id0_0000.mp4` | 가짜 (메인 모델 오판) | 0.84 | 0.85 | 0.51 | 88 BPM | 0.04 (얼굴 크기) |
 
-   - 5단계 코드(`docs/stage5-plan` 브랜치 이후) 기준 값입니다. 두 영상 모두 SQI가 낮아 화면에 "rPPG 미반영(신호 품질 낮음)"이 나와야 정상입니다.
-   - P_rppg가 P_model과 같게 나오고 "P_rppg 분류기 미적용"이 보이면 예전(4단계) 코드입니다 — 브랜치를 확인합니다.
+   - 5단계 코드(P_rppg 분류기 연결 후) 기준 값입니다. 두 영상 모두 SQI가 낮아 화면에 "rPPG 미반영(신호 품질 낮음)"이 나와야 정상입니다.
+   - P_rppg가 P_model과 같게 나오고 "P_rppg 분류기 미적용"이 보이면 예전(4단계) 코드입니다 — `git pull`로 최신 `main`을 받습니다.
    - 처리 시간은 영상 1편 약 30~50초입니다(첫 작업은 모델을 불러오느라 조금 더 걸림). CPU에 따라 다를 수 있지만 **값은 같아야** 합니다.
 3. 이력 화면에서 두 건을 다시 열어 같은 값이 나오는지, 근거 화면(파형·스펙트럼·특징 표)이 나오는지 봅니다.
 
