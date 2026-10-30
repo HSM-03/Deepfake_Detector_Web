@@ -4,6 +4,8 @@
 영상을 올리면 두 판별 축 — 메인 모델 `P_model`(DeepfakeBench EfficientNet-B4)과 rPPG `P_rppg` — 을 돌려
 `S = (1 − w)·P_model + w·P_rppg` (w = α·SQI)로 융합 판정하고, 웹 대시보드에 판정과 근거를 보여 준다.
 
+> **rPPG 분류기 개선 작업은 `feat/rppg-region` 브랜치에서 진행 중이다.** 이어받는 사람은 `git switch feat/rppg-region` 후 `CLAUDE.md`의 "지금 진행 중", `docs/rppg-region-preregistration.md`, `docs/backend-plan.md` "0. 다음 할 일"을 읽는다. 13주차 초 최종 버전을 고정할 때 main에 합친다.
+
 ## 저장소 구조
 
 ```
