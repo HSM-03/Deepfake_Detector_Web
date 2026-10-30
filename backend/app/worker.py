@@ -31,11 +31,13 @@ def _prepare_db(**_kwargs) -> None:
 @worker_ready.connect
 def _resume_interrupted(**_kwargs) -> None:
     """
-    워커가 켜질 때 한 번: DB에 '진행 중'으로 남은 작업을 다시 큐에 넣는다.
+    워커가 켜질 때 한 번: DB에 '진행 중'·'대기 중'으로 남은 작업을 다시 큐에 넣는다.
     워커는 하나뿐(동시 1개)이라, 지금 막 켜진 시점에 '진행 중'인 작업은 이전 워커가 분석 도중 꺼진 것이다
     (docker compose restart worker는 10초 기다린 뒤 강제로 끈다). 그대로 두면 Redis가 1시간 뒤에야 다시 줘서
     진행 화면이 그동안 멈춰 있다. 다시 넣은 작업은 tasks.py가 남은 기록을 지우고 처음부터 분석하고,
     나중에 원래 메시지가 다시 와도 이미 끝난 작업이라 건너뛴다.
+    '대기 중' 작업은 Redis가 함께 꺼지면(WSL 종료 등) 큐의 메시지가 사라져 영영 대기 중으로 남으므로 같이 다시 넣는다.
+    메시지가 남아 있었다면 같은 작업이 두 번 오지만, 두 번째는 이미 끝난 작업이라 건너뛴다.
     워커를 여러 개 띄우게 되면 다른 워커가 실제로 처리 중인 작업까지 다시 넣으므로 이 방식을 바꿔야 한다.
     """
     import logging
@@ -44,9 +46,10 @@ def _resume_interrupted(**_kwargs) -> None:
     from .models import Job
 
     with SessionLocal() as db:
-        for job in db.query(Job).filter(Job.state == 'running').all():
+        for job in db.query(Job).filter(Job.state.in_(('running', 'queued'))).order_by(Job.created_at).all():
             job.celery_task_id = celery_app.send_task('analyze_video', args=[job.id]).id
-            logging.getLogger('deepfake.tasks').info('[%s] 이전 워커가 분석 도중 꺼져 다시 큐에 넣음', job.id)
+            reason = '이전 워커가 분석 도중 꺼져' if job.state == 'running' else '대기 중이던 작업이라'
+            logging.getLogger('deepfake.tasks').info('[%s] %s 다시 큐에 넣음', job.id, reason)
         db.commit()
 
 
