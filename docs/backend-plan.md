@@ -36,6 +36,30 @@
 - 옮기지 않는 것: `Claude outputs/`(이름·학번이 든 보고서), Docker 볼륨의 분석 이력 DB(PC마다 따로).
 - 옮긴 뒤 확인: `docs/SETUP.md` 6-4(개수)·8절(설치 확인 값), `backend/out/stage5/ffpp_features.jsonl` 줄 수 450.
 
+### 0-2. 팀원이 받을 FF++ 영상 (모두 c0 = `raw`, 2026-10-31 정리)
+5단계 때 받은 영상은 특징 6개만 남기고 지웠다. 부위별 신호를 새로 뽑아야 하므로 ①②는 **5단계와 같은 묶음의 같은 파일을 다시 받고**,
+같은 묶음의 다른 조작 방식을 새로 받는다. 묶음은 `docs/stage5/ffpp_split.json`으로 고정돼 있어 받는 사람이 달라도 같다.
+
+| 용도 | FF++ 안 폴더 | 편수 | 어떤 영상 |
+|---|---|---|---|
+| ① 학습 | `original_sequences/youtube/raw/videos` | 125 | 학습 묶음(`train_old25` + `train_new`)의 진짜 |
+| ① 학습 | `manipulated_sequences/Deepfakes/raw/videos` | 125 | 같은 쌍의 Deepfakes |
+| ① 학습 | `manipulated_sequences/FaceSwap/raw/videos` | 125 | 같은 쌍의 FaceSwap |
+| ② 개발 검증 | `original_sequences/youtube/raw/videos` | 100 | 시험 묶음(`test`)의 진짜 |
+| ② 개발 검증 | `manipulated_sequences/Deepfakes/raw/videos` | 100 | 같은 쌍의 Deepfakes |
+| ② 개발 검증 | `manipulated_sequences/FaceShifter/raw/videos` | 100 | 같은 쌍의 FaceShifter (계속 여부 결정용) |
+| ② 개발 검증 | `manipulated_sequences/Face2Face/raw/videos` | 100 | 같은 쌍의 Face2Face |
+| ② 개발 검증 | `manipulated_sequences/NeuralTextures/raw/videos` | 100 | 같은 쌍의 NeuralTextures |
+| ③ 최종 시험 (**12주차**) | 진짜 + FaceShifter·Face2Face·NeuralTextures | 각 100 | 사전 등록 4절 규칙(남은 묶음, 시드 1, 50묶음). **목록을 먼저 커밋**, 받은 뒤 열지 않고 sha256만 커밋 |
+
+- ①②는 약 875편·85~90GB(4-1 25쌍을 넘겨받으면 50편 줄어듦), ③은 약 400편·40GB. **50쌍(약 10GB)씩 받고 → 부위별 신호 저장 → 지운다.**
+- 받기 전에 할 것
+  1. 팀원 본인 FF++ 승인과 승인 메일의 `download.py`(서버는 EU2 — EU는 연결 거부됐음).
+  2. **FaceShifter c0가 서버에 있는지 1편만 받아 확인**: `python download.py <FF++ 폴더> -d FaceShifter -c raw -t videos -n 1 --server EU2`.
+     없으면 사전 등록 "변경 기록"에 남기고 대안을 정한다.
+  3. **아직 없는 코드(작업 2를 시작할 때 만든다)**: `ffpp_pick.py`에 조작 방식 선택 옵션(지금은 Deepfakes만), 조작 방식별 받기 묶음 파일을 만드는 스크립트
+     (`scripts/make_ffpp_split.py` 확장 — ①②③ 번호가 겹치지 않는지 자동 확인), 부위별 신호 추출 스크립트(사전 등록 6절).
+
 **FaceForensics++ 이용 약관 확인 항목** (FF++ 승인은 저장소 소유자 계정으로 받은 것) — `download.py`가 처음에 보여 주는 이용 약관(TOS) 문서와 승인 메일에서 확인한다.
 1. 승인이 **개인 단위**인지, 같은 연구 프로젝트·기관 단위로 공동 연구자에게도 미치는지.
 2. 승인받은 사람이 **내려받기 스크립트·서버 주소**를 팀원과 공유해도 되는지.
